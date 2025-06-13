@@ -16,11 +16,11 @@ pytesseract>=0.3.10
 python-dateutil>=2.8.2
 
 # Machine Learning and AI
-openai>=0.28
+openai==0.28
 scikit-learn>=1.1.3
 
 # Elasticsearch
-elasticsearch>=8.9.0
+elasticsearch==8.9.0
 
 # Language Processing
 spacy>=3.4.3

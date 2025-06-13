@@ -96,6 +96,10 @@ def display_results(response_data):
         file_name="validation_results.json",
         mime="application/json"
     )
+st.subheader("🔐 Debug Secrets (temp)")
+st.text(f"Host: {os.getenv('ELASTICSEARCH_HOST')}")
+st.text(f"User: {os.getenv('ELASTICSEARCH_USERNAME')}")
+st.text(f"Pass Set: {'Yes' if os.getenv('ELASTICSEARCH_PASSWORD') else 'No'}")
 
 service_id = st.text_input("Service ID", value="1")
 request_id = st.text_input("Request ID", value="req-12345")
@@ -122,10 +126,7 @@ for i in range(num_directors):
             "drivingLicense": encode_file(st.file_uploader("Driving License", key=f"drivingLicense_{i}"))
         }
     }
-st.subheader("🔐 Debug Secrets (temp)")
-st.text(f"Host: {os.getenv('ELASTICSEARCH_HOST')}")
-st.text(f"User: {os.getenv('ELASTICSEARCH_USERNAME')}")
-st.text(f"Pass Set: {'Yes' if os.getenv('ELASTICSEARCH_PASSWORD') else 'No'}")
+
 
 st.subheader("Company Documents")
 address_proof_type = st.text_input("Address Proof Type")

@@ -1,0 +1,306 @@
+{
+  "validation_rules": {
+    "director_count": {
+      "rule_id": "DIRECTOR_COUNT",
+      "rule_name": "Director Count Validation",
+      "description": "Minimum 2 and Maximum 5 directors allowed",
+      "severity": "high",
+      "is_active": true,
+      "conditions": {
+        "min_directors": 2,
+        "max_directors": 5
+      },
+      "status": "failed",
+      "error_message": null,
+      "details": {}
+    },
+    "passport_photo": {
+      "rule_id": "PASSPORT_PHOTO",
+      "rule_name": "Passport Photo Validation",
+      "description": "Clear passport size photo required",
+      "severity": "high",
+      "is_active": true,
+      "conditions": {
+        "min_clarity_score": 0.7,
+        "is_passport_style": true,
+        "face_visible": true
+      },
+      "status": "passed",
+      "error_message": null,
+      "details": {
+        "status": "passed",
+        "error_message": null
+      }
+    },
+    "signature": {
+      "rule_id": "SIGNATURE",
+      "rule_name": "Signature Validation",
+      "description": "Clear, complete signature required",
+      "severity": "high",
+      "is_active": true,
+      "conditions": {
+        "min_clarity_score": 0.7,
+        "is_handwritten": true,
+        "is_complete": true
+      },
+      "status": "passed",
+      "error_message": null,
+      "details": {
+        "status": "passed",
+        "error_message": null
+      }
+    },
+    "address_proof": {
+      "rule_id": "ADDRESS_PROOF",
+      "rule_name": "Director Address Proof Validation",
+      "description": "Address proof must be in director's name, complete, and within 45 days",
+      "severity": "high",
+      "is_active": true,
+      "conditions": {
+        "max_age_days": 45,
+        "complete_address_required": true,
+        "name_match_required": true
+      },
+      "status": "passed",
+      "error_message": null,
+      "details": {
+        "status": "passed",
+        "error_message": null
+      }
+    },
+    "indian_director_pan": {
+      "rule_id": "INDIAN_DIRECTOR_PAN",
+      "rule_name": "Indian Director PAN Card Validation",
+      "description": "PAN card must be clear and director must be 18+",
+      "severity": "high",
+      "is_active": true,
+      "conditions": {
+        "min_age": 18,
+        "min_clarity_score": 0.7
+      },
+      "status": "failed",
+      "error_message": "Valid PAN card required for Indian director director_2",
+      "details": {
+        "status": "failed",
+        "error_message": "Valid PAN card required for Indian director director_2"
+      }
+    },
+    "indian_director_aadhar": {
+      "rule_id": "INDIAN_DIRECTOR_AADHAR",
+      "rule_name": "Indian Director Aadhar Validation",
+      "description": "Aadhar front and back required, no masked copies",
+      "severity": "high",
+      "is_active": true,
+      "conditions": {
+        "front_required": true,
+        "back_required": true,
+        "masked_not_allowed": true,
+        "different_images_required": true
+      },
+      "status": "failed",
+      "error_message": "Both Aadhar front and back required for Indian director director_2",
+      "details": {
+        "status": "failed",
+        "error_message": "Both Aadhar front and back required for Indian director director_2"
+      }
+    },
+    "foreign_director_docs": {
+      "rule_id": "FOREIGN_DIRECTOR_DOCS",
+      "rule_name": "Foreign Director Document Validation",
+      "description": "Valid driving license and passport required",
+      "severity": "high",
+      "is_active": true,
+      "conditions": {
+        "driving_license_required": true,
+        "passport_required": true,
+        "driving_license_validity_check": true,
+        "passport_validity_check": true
+      },
+      "status": "failed",
+      "error_message": null,
+      "details": {}
+    },
+    "company_address_proof": {
+      "rule_id": "COMPANY_ADDRESS_PROOF",
+      "rule_name": "Company Address Proof Validation",
+      "description": "Address proof within 45 days, in director's name, complete address",
+      "severity": "high",
+      "is_active": true,
+      "conditions": {
+        "max_age_days": 45,
+        "complete_address_required": true,
+        "name_match_required": true
+      },
+      "status": "failed",
+      "error_message": null,
+      "details": {}
+    },
+    "noc_validation": {
+      "rule_id": "NOC_VALIDATION",
+      "rule_name": "No Objection Certificate Validation",
+      "description": "NOC required with property owner's signature",
+      "severity": "high",
+      "is_active": true,
+      "conditions": {
+        "noc_required": true,
+        "signature_required": true
+      },
+      "status": "failed",
+      "error_message": null,
+      "details": {}
+    },
+    "aadhar_pan_linkage": {
+      "rule_id": "AADHAR_PAN_LINKAGE",
+      "rule_name": "Aadhar PAN Linkage Validation",
+      "description": "Verify Aadhar and PAN card are linked",
+      "severity": "high",
+      "is_active": true,
+      "conditions": {
+        "linkage_api_check_required": true
+      },
+      "status": "passed",
+      "error_message": null,
+      "details": {
+        "status": "passed",
+        "error_message": null
+      }
+    }
+  },
+  "document_validation": {
+    "directors": {
+      "director_2": {
+        "nationality": "Indian",
+        "is_authorised": true,
+        "is_valid": false,
+        "validation_errors": [
+          "Valid PAN card required for Indian director director_2",
+          "Both Aadhar front and back required for Indian director director_2"
+        ],
+        "documents": {},
+        "rule_validations": {
+          "indian_director_pan": {
+            "status": "failed",
+            "error_message": "Valid PAN card required for Indian director director_2"
+          },
+          "indian_director_aadhar": {
+            "status": "failed",
+            "error_message": "Both Aadhar front and back required for Indian director director_2"
+          },
+          "aadhar_pan_linkage": {
+            "status": "passed",
+            "error_message": null
+          },
+          "passport_photo": {
+            "status": "passed",
+            "error_message": null
+          },
+          "signature": {
+            "status": "passed",
+            "error_message": null
+          },
+          "address_proof": {
+            "status": "passed",
+            "error_message": null
+          }
+        }
+      },
+      "director_1": {
+        "nationality": "Indian",
+        "is_authorised": true,
+        "is_valid": false,
+        "validation_errors": [
+          "Valid PAN card required for Indian director director_1",
+          "Both Aadhar front and back required for Indian director director_1"
+        ],
+        "documents": {
+          "aadharCardBack": {
+            "source": "/tmp/tmppc51i9o_.jpg",
+            "document_type": "aadhar_back",
+            "is_valid": true,
+            "extracted_data": {
+              "name": "Vishwanathan",
+              "dob": null,
+              "gender": null,
+              "aadhar_number": "6342 1453 2240",
+              "address": "S/O: Vishwanathan, 7/290, 1st CROSS STREET, 7th BLOCK, MUGAPPAIR WEST, Mogappair, Tiruvallur, Tamil Nadu - 60037",
+              "is_masked": false,
+              "clarity_score": 0.85,
+              "is_valid": false
+            }
+          }
+        },
+        "rule_validations": {
+          "indian_director_pan": {
+            "status": "failed",
+            "error_message": "Valid PAN card required for Indian director director_1"
+          },
+          "indian_director_aadhar": {
+            "status": "failed",
+            "error_message": "Both Aadhar front and back required for Indian director director_1"
+          },
+          "aadhar_pan_linkage": {
+            "status": "passed",
+            "error_message": null
+          },
+          "passport_photo": {
+            "status": "passed",
+            "error_message": null
+          },
+          "signature": {
+            "status": "passed",
+            "error_message": null
+          },
+          "address_proof": {
+            "status": "passed",
+            "error_message": null
+          }
+        }
+      },
+      "rule_validations": {
+        "director_count": {
+          "status": "passed",
+          "error_message": null
+        },
+        "indian_director_pan": {
+          "status": "failed",
+          "error_message": "Valid PAN card required for Indian director director_1"
+        },
+        "indian_director_aadhar": {
+          "status": "failed",
+          "error_message": "Both Aadhar front and back required for Indian director director_1"
+        },
+        "aadhar_pan_linkage": {
+          "status": "passed",
+          "error_message": null
+        },
+        "passport_photo": {
+          "status": "passed",
+          "error_message": null
+        },
+        "signature": {
+          "status": "passed",
+          "error_message": null
+        },
+        "address_proof": {
+          "status": "passed",
+          "error_message": null
+        }
+      }
+    },
+    "companyDocuments": {
+      "address_proof_type": {
+        "extraction_status": "failed",
+        "document_type": "address_proof_type",
+        "error_message": "Failed to load document",
+        "clarity_score": 0.0
+      }
+    }
+  },
+  "metadata": {
+    "service_id": "1",
+    "request_id": "req-12345",
+    "timestamp": "2025-06-13T23:02:11.633750",
+    "processing_time": 22.916886568069458,
+    "is_compliant": false
+  }
+}

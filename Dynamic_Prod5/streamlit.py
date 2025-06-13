@@ -4,6 +4,15 @@ import json
 from services.validation_service import DocumentValidationService
 from api.document_validation_api import DocumentValidationAPI
 
+import os
+
+# Load from secrets (Streamlit deployment)
+if "ELASTICSEARCH_PASSWORD" in st.secrets:
+    os.environ["ELASTICSEARCH_HOST"] = st.secrets["ELASTICSEARCH_HOST"]
+    os.environ["ELASTICSEARCH_USERNAME"] = st.secrets["ELASTICSEARCH_USERNAME"]
+    os.environ["ELASTICSEARCH_PASSWORD"] = st.secrets["ELASTICSEARCH_PASSWORD"]
+    os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
+
 st.title("Document Validation UI")
 
 validation_api = DocumentValidationAPI()
@@ -113,6 +122,10 @@ for i in range(num_directors):
             "drivingLicense": encode_file(st.file_uploader("Driving License", key=f"drivingLicense_{i}"))
         }
     }
+st.subheader("🔐 Debug Secrets (temp)")
+st.text(f"Host: {os.getenv('ELASTICSEARCH_HOST')}")
+st.text(f"User: {os.getenv('ELASTICSEARCH_USERNAME')}")
+st.text(f"Pass Set: {'Yes' if os.getenv('ELASTICSEARCH_PASSWORD') else 'No'}")
 
 st.subheader("Company Documents")
 address_proof_type = st.text_input("Address Proof Type")

@@ -17,9 +17,10 @@ class Config:
     
     # Elasticsearch Configuration
     ELASTICSEARCH_HOST = os.getenv(
-        'ELASTICSEARCH_HOST', 
-        'https://vs-production.es.ap-south-1.aws.elastic-cloud.com:9243'
+        'ELASTICSEARCH_HOST',
+        'https://my-deployment-3eafc9.es.ap-south-1.aws.elastic-cloud.com:9243'
     )
+
     ELASTICSEARCH_USERNAME = os.getenv('ELASTICSEARCH_USERNAME', 'elastic')
     ELASTICSEARCH_PASSWORD = os.getenv('ELASTICSEARCH_PASSWORD', '')
 

@@ -25,7 +25,8 @@ def encode_file(file):
     except Exception as e:
         return None
 
-def display_results(response_data):
+def display_results(response_data,_):
+    #st.write(response_data["document_validation"]["companyDocuments"])
     st.subheader("📊 Validation Overview")
     col1, col2, col3 = st.columns(3)
 
@@ -79,15 +80,47 @@ def display_results(response_data):
                 cols[i % 3].write(status)
 
     st.subheader("🏢 Company Documents Status")
-    company_docs = response_data.get('document_validation', {}).get('companyDocuments', {})
-    for doc_type, details in company_docs.items():
-        status = details.get('status', '')
-        errors = details.get('error_messages', [])
-        if status.lower() == 'valid':
-            st.success(f"✅ {doc_type.replace('_', ' ').title()}")
-        else:
-            error_list = "\n".join([f"\u2022 {err}" for err in errors])
-            st.error(f"\n❌ {doc_type.replace('_', ' ').title()}\n{error_list}")
+    company_docs = _.get('document_validation', {}).get('companyDocuments', {})
+    # for doc_type, details in company_docs.items():
+    #     status = details.get('status', '')
+    #     errors = details.get('error_messages', [])
+    #     if status.lower() == 'valid':
+    #         st.success(f"✅ {doc_type.replace('_', ' ').title()}")
+    #     else:
+    #         error_list = "\n".join([f"\u2022 {err}" for err in errors])
+    #         st.error(f"\n❌ {doc_type.replace('_', ' ').title()}\n{error_list}")
+    # for doc_type in ["addressProof", "noc"]:
+    #     details = company_docs.get(doc_type, {})
+    #     status = details.get('status', '')
+    #     errors = details.get('error_messages', [])
+
+    #     if status.lower() == 'valid':
+    #         st.success(f"✅ {doc_type.replace('_', ' ').title()}")
+    #     else:
+    #         error_list = "\n".join([f"\u2022 {err}" for err in errors])
+    #         st.error(f"❌ {doc_type.replace('_', ' ').title()}\n{error_list}")
+    doc_display_names = {
+        "addressProof": "Address Proof",
+        "noc": "NOC (No Objection Certificate)"
+    }
+    #st.write(company_docs["addressProof"])
+    for doc_type in ["addressProof", "noc"]:
+        if doc_type in company_docs:
+            details = company_docs.get(doc_type, {})
+            status = details.get('status', 'Unknown')
+            errors = details.get('error_messages', [])
+            
+            # Get display name
+            display_name = doc_display_names.get(doc_type, doc_type.replace('_', ' ').title())
+            
+            if status.lower() == 'valid':
+                st.success(f"✅ {display_name}")
+            else:
+                if errors:
+                    error_list = "\n".join([f"• {err}" for err in errors])
+                    st.error(f"❌ {display_name}\n{error_list}")
+                else:
+                    st.error(f"❌ {display_name}\nValidation failed")
 
     st.subheader("📥 Download Results")
     st.download_button(
@@ -146,8 +179,10 @@ if st.button("Validate Documents"):
     }
     try:
         api_response, _ = validation_api.validate_document(payload)
+        #st.write(api_response["document_validation"]["companyDocuments"])
+        #st.write(_["document_validation"]["companyDocuments"])
         st.success("✅ Validation Completed Successfully!")
-        display_results(api_response)
+        display_results(api_response,_)
         with st.expander("Show Raw Validation Response"):
             st.json(api_response)
     except Exception as e:

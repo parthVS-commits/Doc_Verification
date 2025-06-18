@@ -479,18 +479,28 @@ class DocumentValidationService:
             )
             
             # Validate company documents
-            # company_docs_validation = self._validate_company_documents(
-            #     input_data.get('companyDocuments', {}),
-            #     input_data.get('directors', {}),
+            company_docs_validation = self._validate_company_documents(
+                input_data.get('companyDocuments', {}),
+                input_data.get('directors', {}),
+                compliance_rules,
+                preconditions
+            )
+            # company_docs_validation = self._process_company_documents(
+            #     input_data.get('companyDocuments', {})#,
+            #     #input_data.get('directors', {}),
+            #     #compliance_rules,
+            #     #preconditions
+            # )
+            # company_docs_extracted = self._process_company_documents(
+            #     input_data.get('companyDocuments', {})
+            # )
+
+            # company_docs_validation = self._apply_company_rules(
+            #     company_docs_extracted,
             #     compliance_rules,
             #     preconditions
             # )
-            company_docs_validation = self._process_company_documents(
-                input_data.get('companyDocuments', {})#,
-                #input_data.get('directors', {}),
-                #compliance_rules,
-                #preconditions
-            )
+
             
             # Calculate processing time
             processing_time = time.time() - start_time
@@ -507,13 +517,20 @@ class DocumentValidationService:
             )
             
             # Prepare standard result
+            # standard_result = {
+            #     "validation_rules": self._prepare_validation_rules(directors_validation, company_docs_validation, compliance_rules),
+            #     "document_validation": {
+            #         "directors": directors_validation,
+            #         "companyDocuments": company_docs_validation
+            #     }
+            # }
             standard_result = {
                 "validation_rules": self._prepare_validation_rules(directors_validation, company_docs_validation, compliance_rules),
                 "document_validation": {
                     "directors": directors_validation,
-                    "companyDocuments": company_docs_validation
+                    "companyDocuments": company_docs_validation                    }
                 }
-            }
+            
             
             # Prepare detailed result
             detailed_result = {
@@ -556,12 +573,12 @@ class DocumentValidationService:
                 for error in company_docs_validation["validation_errors"]:
                     print(f"❌ {error}")
                     errors_found = True
-            
+            print(company_docs_validation["addressProof"]["error_messages"])
             if not errors_found:
                 print("✅ All validations passed")
                     
             print("\nDetailed results saved to detailed_validation_results.json")
-            
+            print(detailed_result["document_validation"]["companyDocuments"]["addressProof"]["error_messages"])
             return standard_result, detailed_result
             
         except Exception as e:
@@ -745,27 +762,45 @@ class DocumentValidationService:
             # Check for validation errors in company documents
             validation_errors = company_docs_validation.get('validation_errors', [])
             
-            # Company address proof validation
-            if 'company_address_proof' in validation_defaults and validation_errors:
-                validation_defaults['company_address_proof'] = {
-                    "status": "failed",
-                    "error_message": validation_errors[0] if validation_errors else None
-                }
+            # # Company address proof validation
+            # if 'company_address_proof' in validation_defaults and validation_errors:
+            #     validation_defaults['company_address_proof'] = {
+            #         "status": "failed",
+            #         "error_message": validation_errors[0] if validation_errors else None
+            #     }
             
-            # NOC validation
+            # # NOC validation
+            # if 'noc_validation' in validation_defaults:
+            #     noc_validation = company_docs_validation.get('noc_validation', {})
+            #     if noc_validation:
+            #         validation_defaults['noc_validation'] = {
+            #             "status": noc_validation.get('status', 'failed').lower(),
+            #             "error_message": noc_validation.get('error_message')
+            #         }
+            #     elif validation_errors:
+            #         validation_defaults['noc_validation'] = {
+            #             "status": "failed",
+            #             "error_message": validation_errors[0] if validation_errors else None
+            #         }
+            
             if 'noc_validation' in validation_defaults:
-                noc_validation = company_docs_validation.get('noc_validation', {})
-                if noc_validation:
-                    validation_defaults['noc_validation'] = {
-                        "status": noc_validation.get('status', 'failed').lower(),
-                        "error_message": noc_validation.get('error_message')
-                    }
-                elif validation_errors:
-                    validation_defaults['noc_validation'] = {
-                        "status": "failed",
-                        "error_message": validation_errors[0] if validation_errors else None
-                    }
-            
+                noc_data = company_docs_validation.get('noc', {})
+                noc_errors = noc_data.get("error_messages", [])
+                validation_defaults['noc_validation'] = {
+                    "status": "failed" if noc_errors else "passed",
+                    "error_message": noc_errors[0] if noc_errors else None
+                }
+
+            if 'company_address_proof' in validation_defaults:
+                addr_data = company_docs_validation.get('addressProof', {})
+                addr_errors = addr_data.get("error_messages", [])
+                validation_defaults['company_address_proof'] = {
+                    "status": "failed" if addr_errors else "passed",
+                    "error_message": addr_errors[0] if addr_errors else None
+                }
+
+
+
             # NOC Owner validation
             if 'noc_owner_validation' in validation_defaults:
                 noc_owner_validation = company_docs_validation.get('noc_owner_validation', {})
@@ -1205,6 +1240,44 @@ class DocumentValidationService:
         return processed_docs
 
 
+    def _apply_company_rules(
+        self,
+        extracted_docs: Dict[str, Any],
+        compliance_rules: Dict,
+        preconditions: Dict = None
+    ) -> Dict[str, Any]:
+        validation_result = extracted_docs.copy()
+        validation_errors = []
+        
+        rules = self._extract_rules_from_compliance_data(compliance_rules)
+        
+        # Apply COMPANY_ADDRESS_PROOF rule
+        if "addressProof" in extracted_docs:
+            address_rule = next(
+                (rule for rule in rules if rule.get('rule_id') == 'COMPANY_ADDRESS_PROOF'),
+                None
+            )
+            if address_rule:
+                result = self._validate_company_address_proof_rule(
+                    extracted_docs,
+                    address_rule.get('conditions', {})
+                )
+                if result["status"] != "passed":
+                    validation_errors.append(result["error_message"])
+                    validation_result["addressProof"]["is_valid"] = False
+                else:
+                    validation_result["addressProof"]["is_valid"] = True
+        
+        # Optionally handle NOC or other company docs here too...
+
+        if validation_errors:
+            validation_result["validation_errors"] = validation_errors
+            validation_result["is_valid"] = False
+        else:
+            validation_result["is_valid"] = True
+
+        return validation_result
+
 
     def _extract_document_data_safe(
         self, 
@@ -1423,6 +1496,27 @@ class DocumentValidationService:
         
         return doc_type_mapping.get(doc_key, 'unknown')
 
+    def _save_base64_to_tempfile(self, base64_str: str, doc_type_hint: str = "pdf") -> str:
+        """
+        Convert base64 string to temp file and return file path.
+        
+        Args:
+            base64_str (str): Base64 encoded string.
+            doc_type_hint (str): 'pdf' or 'jpg'
+        
+        Returns:
+            str: Temporary file path
+        """
+        try:
+            decoded = base64.b64decode(base64_str)
+            suffix = ".pdf" if "JVBER" in base64_str[:20] or doc_type_hint == "pdf" else ".jpg"
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+                temp_file.write(decoded)
+                return temp_file.name
+        except Exception as e:
+            self.logger.error(f"Failed to convert base64 to temp file: {e}")
+            raise
+
     def _validate_company_documents(
         self, 
         company_docs: Dict[str, Any],
@@ -1447,31 +1541,76 @@ class DocumentValidationService:
             rules = self._extract_rules_from_compliance_data(compliance_rules)
             
             validation_result = {}
-            validation_errors = []
-            
+            # validation_errors = []
+            # doc_specific_errors = {
+            #     "addressProof": [],
+            #     "noc": [],
+            # }
+            addprf_error = []
+            noc_error = []
             # Use ThreadPoolExecutor for parallel processing of company documents
             with ThreadPoolExecutor(max_workers=2) as executor:
                 # Submit address proof task
                 address_proof_future = None
                 if 'addressProof' in company_docs:
-                    address_proof_url = company_docs.get('addressProof')
-                    if address_proof_url:
-                        address_proof_future = executor.submit(
-                            self.extraction_service.extract_document_data,
-                            address_proof_url,
-                            'address_proof'
-                        )
+                    address_proof_input = company_docs.get('addressProof')
+                    if address_proof_input:
+                        try:
+                            if address_proof_input.startswith("http://") or address_proof_input.startswith("https://"):
+                                source = address_proof_input
+                            else:
+                                source = self._save_base64_to_tempfile(address_proof_input, "pdf")
+                            
+                            address_proof_future = executor.submit(
+                                self.extraction_service.extract_document_data,
+                                source,
+                                'address_proof'
+                            )
+                        except Exception as e:
+                            self.logger.error(f"Failed to process addressProof input: {e}")
+                            addprf_error.append(f"Failed to process address proof: {str(e)}")
+
+                # address_proof_future = None
+                # if 'addressProof' in company_docs:
+                #     address_proof_url = company_docs.get('addressProof')
+                #     if address_proof_url:
+                #         address_proof_future = executor.submit(
+                #             self.extraction_service.extract_document_data,
+                #             address_proof_url,
+                #             'address_proof'
+                #         )
                 
                 # Submit NOC task
+                # noc_future = None
+                # if 'noc' in company_docs:
+                #     noc_url = company_docs.get('noc')
+                #     if noc_url:
+                #         noc_future = executor.submit(
+                #             self.extraction_service.extract_document_data,
+                #             noc_url,
+                #             'noc'
+                #         )
+
+                # Submit noc task
                 noc_future = None
                 if 'noc' in company_docs:
-                    noc_url = company_docs.get('noc')
-                    if noc_url:
-                        noc_future = executor.submit(
-                            self.extraction_service.extract_document_data,
-                            noc_url,
-                            'noc'
-                        )
+                    noc_input = company_docs.get('noc')
+                    if noc_input:
+                        try:
+                            if noc_input.startswith("http://") or noc_input.startswith("https://"):
+                                source = noc_input
+                            else:
+                                source = self._save_base64_to_tempfile(noc_input, "pdf")
+                            
+                            noc_future = executor.submit(
+                                self.extraction_service.extract_document_data,
+                                source,
+                                'noc'
+                            )
+                        except Exception as e:
+                            self.logger.error(f"Failed to process noc input: {e}")
+                            noc_error.append(f"Failed to process NOC: {str(e)}")
+
                 
                 # Process address proof result
                 if address_proof_future:
@@ -1493,12 +1632,21 @@ class DocumentValidationService:
                             "is_valid": address_proof_data is not None,
                             "clarity_score": clarity_score,
                             "complete_address_visible": complete_address,
-                            "extracted_data": address_proof_data
+                            "extracted_data": address_proof_data,
+                            "status": "Not Valid",
+                            "error_messages": [],
                         }
                         
                         # Validate age if extracted data available
                         if address_proof_data:
                             # Get company address proof rule
+                            # Step 1: Validate required fields
+                            required_fields = ['address', 'date']
+                            missing_fields = [field for field in required_fields if not address_proof_data.get(field)]
+
+                            if missing_fields:
+                                addprf_error.append(f"Address proof missing required fields: {', '.join(missing_fields)}")
+
                             company_address_rule = next(
                                 (rule for rule in rules if rule.get('rule_id') == 'COMPANY_ADDRESS_PROOF'), 
                                 None
@@ -1519,10 +1667,17 @@ class DocumentValidationService:
                                             doc_age = (today - doc_date).days
                                             # Use max_age_days from rule conditions
                                             if doc_age > max_age_days:
-                                                validation_errors.append(f"Address proof is {doc_age} days old (exceeds {max_age_days} days limit)")
+                                                addprf_error.append(f"Address proof is {doc_age} days old (exceeds {max_age_days} days limit)")
                                     except Exception as e:
                                         self.logger.error(f"Error calculating document age: {e}")
-                    
+                                        addprf_error.append(f"Error validating address proof date: {str(e)}")
+                        else:
+                            addprf_error.append("Address proof data extraction failed")
+                        # validation_result["addressProof"]["is_valid"] = not any(
+                        #     err.lower().startswith("address proof") for err in doc_specific_errors["addressProof"]
+                        # )
+                        validation_result["addressProof"]["is_valid"] = len(addprf_error) == 0
+
                     except Exception as e:
                         self.logger.error(f"Error processing address proof: {str(e)}", exc_info=True)
                         validation_result["addressProof"] = {
@@ -1530,43 +1685,66 @@ class DocumentValidationService:
                             "is_valid": False,
                             "error": str(e)
                         }
-                        validation_errors.append(f"Address proof error: {str(e)}")
+                        addprf_error.append(f"Address proof error: {str(e)}")
                 
                 # Process NOC result
                 if noc_future:
                     try:
                         noc_data = noc_future.result()
                         
-                        validation_result["noc"] = {
-                            "url": company_docs.get('noc'),
-                            "is_valid": noc_data is not None,
-                            "has_signature": noc_data.get('has_signature', True) if noc_data else False,
-                            "extracted_data": noc_data
-                        }
                         
-                        # Validate NOC Owner Name if preconditions are provided
-                        if noc_data and preconditions and 'owner_name' in preconditions:
-                            noc_owner_rule = next(
-                                (rule for rule in rules if rule.get('rule_id') == 'NOC_OWNER_VALIDATION'), 
-                                None
-                            )
+                        if not isinstance(noc_data, dict) or not noc_data.get("has_signature", False):
+                            noc_error.append("NOC verification failed or invalid format")
+                            validation_result["noc"] = {
+                                "source": company_docs.get('noc'),
+                                "is_valid": False,
+                                "has_signature": False,
+                                "extracted_data": noc_data,
+                                "status": "Failed",
+                                "error_messages": noc_error
+                            }
+                        else:
+                            validation_result["noc"] = {
+                                "source": company_docs.get('noc'),
+                                "has_signature": noc_data.get('has_signature', True) if noc_data else False,
+                                "extracted_data": noc_data
+                            }
+                            is_noc_valid = True
                             
-                            if noc_owner_rule:
-                                expected_owner_name = preconditions.get('owner_name')
-                                actual_owner_name = noc_data.get('owner_name')
-                                
-                                # Store the validation result for NOC owner
-                                noc_owner_validation = self._validate_noc_owner_name(
-                                    actual_owner_name, 
-                                    expected_owner_name
+                            # Validate NOC Owner Name if preconditions are provided
+                            if noc_data and preconditions and 'owner_name' in preconditions:
+                                noc_owner_rule = next(
+                                    (rule for rule in rules if rule.get('rule_id') == 'NOC_OWNER_VALIDATION'), 
+                                    None
                                 )
                                 
-                                # Store the validation in result
-                                validation_result["noc_owner_validation"] = noc_owner_validation
-                                
-                                # Add to validation errors if failed
-                                if noc_owner_validation["status"] != "passed":
-                                    validation_errors.append(noc_owner_validation["error_message"])
+                                if noc_owner_rule:
+                                    expected_owner_name = preconditions.get('owner_name')
+                                    actual_owner_name = noc_data.get('owner_name')
+                                    
+                                    # Store the validation result for NOC owner
+                                    noc_owner_validation = self._validate_noc_owner_name(
+                                        actual_owner_name, 
+                                        expected_owner_name
+                                    )
+                                    
+                                    # Store the validation in result
+                                    validation_result["noc_owner_validation"] = noc_owner_validation
+                                    
+                                    # Add to validation errors if failed
+                                    if noc_owner_validation["status"] != "passed":
+                                        noc_error.append(noc_owner_validation["error_message"])
+                            if not noc_data or not validation_result["noc"]["has_signature"]:
+                                noc_error.append("NOC does not contain a valid signature")
+                                is_noc_valid = False
+
+                        # validation_result["noc"]["is_valid"] = is_noc_valid
+                        # validation_result["noc"]["is_valid"] = not any(
+                        #     err.lower().startswith("noc") for err in doc_specific_errors["noc"]
+                        # )
+                        validation_result["noc"]["is_valid"] = len(noc_error) == 0
+
+
                     
                     except Exception as e:
                         self.logger.error(f"Error processing NOC: {str(e)}", exc_info=True)
@@ -1575,15 +1753,77 @@ class DocumentValidationService:
                             "is_valid": False,
                             "error": str(e)
                         }
-                        validation_errors.append(f"NOC error: {str(e)}")
+                        noc_error.append(f"NOC error: {str(e)}")
             
             # Add validation errors
-            if validation_errors:
-                validation_result["validation_errors"] = validation_errors
-                validation_result["is_valid"] = False
-            else:
-                validation_result["is_valid"] = True
-            
+            # if validation_errors:
+            #     validation_result["validation_errors"] = validation_errors
+            #     validation_result["is_valid"] = False
+            # else:
+            #     validation_result["is_valid"] = True
+            # Convert internal result into display-friendly format
+            # for doc_key in ["addressProof", "noc"]:
+            #     if doc_key in validation_result:
+            #         doc_entry = validation_result[doc_key]
+            #         errors = []
+
+            #         # Append global validation_errors if they relate to this doc
+            #         # if "validation_errors" in validation_result:
+            #         #     for err in validation_result["validation_errors"]:
+            #         #         if doc_key.lower() in err.lower():
+            #         #             errors.append(err)
+            #         for err in validation_result.get("validation_errors", []):
+            #             if doc_key == "addressProof" and err.lower().startswith("address proof"):
+            #                 errors.append(err)
+            #             elif doc_key == "noc" and err.lower().startswith("noc"):
+            #                 errors.append(err)
+
+            #         doc_entry["status"] = "Valid" if doc_entry.get("is_valid") and not errors else "Failed"
+            #         doc_entry["error_messages"] = errors
+            # Format statuses only for keys that exist
+
+            # for doc_key in validation_result.keys():
+            #     if doc_key not in ["addressProof", "noc"]:
+            #         continue  # skip any extra keys like validation_errors, etc.
+                
+            #     doc_entry = validation_result[doc_key]
+            #     errors = []
+
+            #     for err in validation_result.get("validation_errors", []):
+            #         if doc_key == "addressProof" and err.lower().startswith("address proof"):
+            #             errors.append(err)
+            #         elif doc_key == "noc" and err.lower().startswith("noc"):
+            #             errors.append(err)
+
+            #     doc_entry["status"] = "Valid" if doc_entry.get("is_valid") and not errors else "Failed"
+            #     doc_entry["error_messages"] = errors
+            # Assign errors per document
+            # for doc_key in doc_specific_errors:
+            #     if doc_key in validation_result:
+            #         errors = doc_specific_errors.get(doc_key, [])
+            #         validation_result[doc_key]["error_messages"] = errors
+            #         validation_result[doc_key]["status"] = "Valid" if validation_result[doc_key].get("is_valid") and not errors else "Failed"
+
+            # # Combine all document-level errors into one validation_errors array
+            # all_errors = []
+            # for errs in doc_specific_errors.values():
+            #     all_errors.extend(errs)
+
+            # validation_result["validation_errors"] = all_errors
+            # validation_result["is_valid"] = len(all_errors) == 0
+            # Attach errors to result
+            if "addressProof" in validation_result:
+                validation_result["addressProof"]["error_messages"] = addprf_error
+                validation_result["addressProof"]["status"] = "Valid" if validation_result["addressProof"]["is_valid"] else "Failed"
+
+            if "noc" in validation_result:
+                validation_result["noc"]["error_messages"] = noc_error
+                validation_result["noc"]["status"] = "Valid" if validation_result["noc"]["is_valid"] else "Failed"
+
+            # Final decision
+            validation_result["validation_errors"] = addprf_error + noc_error
+            validation_result["is_valid"] = len(addprf_error + noc_error) == 0
+            #print(validation_result["addressProof"]["error_messages"])
             return validation_result
                 
         except Exception as e:
@@ -2234,61 +2474,124 @@ class DocumentValidationService:
             "error_message": None
         }
     
+
     def _validate_company_address_proof_rule(self, company_docs_validation, conditions):
         """
-        Validate company address proof with better date parsing
+        Validate company address proof with comprehensive date and address parsing
         
         Args:
             company_docs_validation (dict): Company document validation data
-            conditions (dict): Rule conditions
-        
+            conditions (dict): Rule conditions from compliance rules
+            
         Returns:
-            dict: Validation result
+            dict: Validation result with status and error message
         """
-        # Get conditions
+        # Get rule conditions with defaults
         max_age_days = conditions.get('max_age_days', 45)
         complete_address_required = conditions.get('complete_address_required', True)
         name_match_required = conditions.get('name_match_required', False)
         
-        # Check if address proof exists
+        # Check if address proof exists and is valid
         address_proof = company_docs_validation.get('addressProof', {})
         if not address_proof or not address_proof.get('is_valid', False):
             return {
                 "status": "failed",
                 "error_message": "Valid company address proof required"
             }
-        
-        # Get extraction data
+
+        # Safely extract document data
         extracted_data = address_proof.get('extracted_data', {})
+        fields = extracted_data.get('extracted_fields', {})
         
-        # Check document age with improved date parsing
-        date_str = extracted_data.get('date') or extracted_data.get('bill_date')
-        if date_str:
-            doc_date = self._parse_date(date_str)
-            if doc_date:
-                today = datetime.now()
-                doc_age = (today - doc_date).days
-                if doc_age > max_age_days:
-                    return {
-                        "status": "failed",
-                        "error_message": f"Company address proof is {doc_age} days old (exceeds {max_age_days} days limit)"
-                    }
+        # If no extracted_fields, try to use extracted_data directly
+        if not fields and extracted_data:
+            fields = extracted_data
+
+        # 1. Date validation
+        date_keys = [
+            'date', 'bill_date', 'invoice_date', 'billing_date', 
+            'generated_on', 'due_date', 'txn_date', 'value_date',
+            'document_date', 'issue_date'
+        ]
         
-        # Check for complete address
+        doc_date = None
+        date_found = None
+        
+        for key in date_keys:
+            if key in fields and fields[key]:
+                try:
+                    doc_date = self._parse_date(fields[key])
+                    if doc_date:
+                        date_found = key
+                        break
+                except Exception as e:
+                    self.logger.debug(f"Failed to parse date from {key}: {fields[key]} - {e}")
+                    continue
+        
+        if not doc_date:
+            return {
+                "status": "failed",
+                "error_message": "No valid date found in company address proof document"
+            }
+
+        # Check document age
+        doc_age = (datetime.now() - doc_date).days
+        if doc_age > max_age_days:
+            return {
+                "status": "failed",
+                "error_message": f"Company address proof is {doc_age} days old (exceeds {max_age_days} days limit)"
+            }
+
+        # 2. Address validation
         if complete_address_required:
-            address = extracted_data.get('address', '')
-            if not address or len(address.strip()) < 10:
+            address_fields = [
+                'address', 'billing_address', 'consumer_address', 
+                'service_address', 'full_address', 'complete_address'
+            ]
+            
+            address = None
+            address_field_found = None
+            
+            for field in address_fields:
+                if field in fields and fields[field]:
+                    address = fields[field].strip()
+                    if address and len(address) >= 10:  # Minimum viable address length
+                        address_field_found = field
+                        break
+            
+            if not address or len(address) < 10:
+                self.logger.debug(f"Available fields: {list(fields.keys())}")
+                self.logger.debug(f"Address found: '{address}' from field: {address_field_found}")
                 return {
                     "status": "failed",
-                    "error_message": "Company address proof does not contain a complete address"
+                    "error_message": "Company address proof does not contain a complete address (minimum 10 characters required)"
                 }
-        
-        # All checks passed
+
+        # 3. Name matching validation (if required)
+        if name_match_required:
+            # This would require company name from preconditions or input data
+            # Implementation depends on your specific requirements
+            company_name = self._current_preconditions.get('company_name', '')
+            if company_name:
+                name_fields = ['company_name', 'business_name', 'consumer_name', 'name']
+                doc_name = None
+                
+                for field in name_fields:
+                    if field in fields and fields[field]:
+                        doc_name = fields[field].strip()
+                        break
+                
+                if not doc_name or company_name.lower() not in doc_name.lower():
+                    return {
+                        "status": "failed",
+                        "error_message": "Company name in address proof does not match registered company name"
+                    }
+
+        # All validations passed
         return {
             "status": "passed",
             "error_message": None
         }
-    
     def _validate_noc_rule(self, company_docs_validation, conditions):
         """
         Validate No Objection Certificate (NOC) with more flexible validation
@@ -2636,14 +2939,19 @@ class DocumentValidationService:
         
         # Try multiple date formats in order of preference
         formats = [
-            '%d/%m/%Y',  # DD/MM/YYYY
-            '%Y-%m-%d',  # YYYY-MM-DD
-            '%d-%m-%Y',  # DD-MM-YYYY
-            '%m/%d/%Y',  # MM/DD/YYYY
-            '%d %B %Y',  # DD Month YYYY
-            '%d %b %Y',  # DD Mon YYYY
-            '%B %d, %Y', # Month DD, YYYY
-            '%b %d, %Y'  # Mon DD, YYYY
+            '%Y-%m-%d',           # 2024-01-15
+            '%d-%m-%Y',           # 15-01-2024
+            '%d/%m/%Y',           # 15/01/2024
+            '%m/%d/%Y',           # 01/15/2024
+            '%Y/%m/%d',           # 2024/01/15
+            '%d.%m.%Y',           # 15.01.2024
+            '%Y.%m.%d',           # 2024.01.15
+            '%d %b %Y',           # 15 Jan 2024
+            '%d %B %Y',           # 15 January 2024
+            '%b %d, %Y',          # Jan 15, 2024
+            '%B %d, %Y',          # January 15, 2024
+            '%Y-%m-%d %H:%M:%S',  # 2024-01-15 10:30:00
+            '%d-%m-%Y %H:%M:%S',  # 15-01-2024 10:30:00
         ]
         
         for fmt in formats:
@@ -2709,3 +3017,4 @@ class DocumentValidationService:
         
         # If at least 50% words match
         return len(common_words) >= min(len(parts1), len(parts2)) / 2
+

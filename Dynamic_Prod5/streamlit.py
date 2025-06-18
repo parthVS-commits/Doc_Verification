@@ -66,18 +66,43 @@ def display_results(response_data,_):
     directors = response_data.get('document_validation', {}).get('directors', {})
     for director_name, details in directors.items():
         with st.expander(f"{director_name.replace('_', ' ').title()} Documents", expanded=True):
-            cols = st.columns(3)
+            cols = st.columns(2)
             doc_statuses = []
-            for doc_type, doc_details in details.get('documents', {}).items():
-                status = doc_details.get('status', '')
+            expected_docs = [
+                "aadharCardFront", "aadharCardBack", "panCard", "passportPhoto",
+                "address_proof", "signature", "passport", "drivingLicense"
+            ]
+            actual_docs = details.get('documents', {})
+            if details.get("nationality", "").lower() == "foreign":
+                st.info("Passport or Driving License must be provided for foreign directors. Aadhaar is not applicable.")
+            else:
+                st.info("Aadhaar is required for Indian directors. Passport/Driving License is not mandatory.")
+
+            for doc_type in expected_docs:
+                doc_details = actual_docs.get(doc_type, {})
+                status = doc_details.get('status', 'Not Uploaded')
                 errors = doc_details.get('error_messages', [])
+
+                display_name = doc_type.replace('_', ' ').replace('Card', ' Card').title()
+                
                 if status.lower() == 'valid':
-                    doc_statuses.append(f"✅ {doc_type.replace('_', ' ').title()}")
+                    doc_statuses.append(f"✅ {display_name}")
                 else:
-                    error_list = "\n".join([f"\u2022 {err}" for err in errors])
-                    doc_statuses.append(f"\n❌ {doc_type.replace('_', ' ').title()}\n{error_list}")
+                    if not errors and status == 'Not Uploaded':
+                        doc_statuses.append(f"❌ {display_name}\n• Document not uploaded")
+                    else:
+                        error_list = "\n".join([f"\u2022 {err}" for err in errors])
+                        doc_statuses.append(f"❌ {display_name}\n{error_list}")           
+            # for doc_type, doc_details in details.get('documents', {}).items():
+            #     status = doc_details.get('status', '')
+            #     errors = doc_details.get('error_messages', [])
+            #     if status.lower() == 'valid':
+            #         doc_statuses.append(f"✅ {doc_type.replace('_', ' ').title()}")
+            #     else:
+            #         error_list = "\n".join([f"\u2022 {err}" for err in errors])
+            #         doc_statuses.append(f"\n❌ {doc_type.replace('_', ' ').title()}\n{error_list}")
             for i, status in enumerate(doc_statuses):
-                cols[i % 3].write(status)
+                cols[i % 2].write(status)
 
     st.subheader("🏢 Company Documents Status")
     company_docs = _.get('document_validation', {}).get('companyDocuments', {})
@@ -144,6 +169,10 @@ for i in range(num_directors):
     nationality = st.selectbox(f"Nationality for Director {i+1}", options=["Indian", "Foreign"], key=f"nat_{i}")
     authorised = st.selectbox(f"Authorised for Director {i+1}", options=["Yes", "No"], key=f"auth_{i}")
     st.write("Upload documents for this director:")
+    if nationality == "Foreign":
+        st.info("Note: For foreign directors, Passport or Driving License is mandatory. Aadhaar is not required.")
+    else:
+        st.info("Note: For Indian directors, Aadhaar is required. Passport/Driving License is optional.")
 
     directors[f"director_{i+1}"] = {
         "nationality": nationality,

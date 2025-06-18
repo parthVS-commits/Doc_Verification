@@ -1542,10 +1542,6 @@ class DocumentValidationService:
             
             validation_result = {}
             # validation_errors = []
-            # doc_specific_errors = {
-            #     "addressProof": [],
-            #     "noc": [],
-            # }
             addprf_error = []
             noc_error = []
             # Use ThreadPoolExecutor for parallel processing of company documents
@@ -1673,9 +1669,7 @@ class DocumentValidationService:
                                         addprf_error.append(f"Error validating address proof date: {str(e)}")
                         else:
                             addprf_error.append("Address proof data extraction failed")
-                        # validation_result["addressProof"]["is_valid"] = not any(
-                        #     err.lower().startswith("address proof") for err in doc_specific_errors["addressProof"]
-                        # )
+              
                         validation_result["addressProof"]["is_valid"] = len(addprf_error) == 0
 
                     except Exception as e:
@@ -1738,10 +1732,7 @@ class DocumentValidationService:
                                 noc_error.append("NOC does not contain a valid signature")
                                 is_noc_valid = False
 
-                        # validation_result["noc"]["is_valid"] = is_noc_valid
-                        # validation_result["noc"]["is_valid"] = not any(
-                        #     err.lower().startswith("noc") for err in doc_specific_errors["noc"]
-                        # )
+                  
                         validation_result["noc"]["is_valid"] = len(noc_error) == 0
 
 

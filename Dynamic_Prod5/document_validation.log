@@ -638,3 +638,37 @@
 2025-06-17 17:25:00,654 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
 2025-06-17 17:25:02,472 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
 2025-06-17 17:25:05,208 - document_validation - INFO - [elasticsearch_utils.py:73] - Retrieved 1 rules for service ID: 1
+2025-06-18 10:24:07,986 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:24:08,231 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:24:16,698 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:24:24,895 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:24:30,006 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:24:36,148 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:24:40,962 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:24:50,631 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:24:56,245 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:25:03,214 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:25:06,724 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:25:14,115 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:25:15,378 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:25:19,717 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:25:25,699 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:25:31,997 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:25:38,453 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:25:44,725 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:25:50,740 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:25:55,939 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:26:02,047 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:26:08,908 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:26:15,988 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:26:20,659 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:26:27,418 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:26:33,736 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:26:35,048 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:26:39,764 - document_validation - INFO - [elasticsearch_utils.py:73] - Retrieved 1 rules for service ID: 1
+2025-06-18 10:30:32,901 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:30:34,512 - document_validation - INFO - [elasticsearch_utils.py:73] - Retrieved 1 rules for service ID: 1
+2025-06-18 10:31:32,270 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:31:33,880 - document_validation - INFO - [elasticsearch_utils.py:73] - Retrieved 1 rules for service ID: 1
+2025-06-18 10:32:25,351 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
+2025-06-18 10:32:26,912 - document_validation - INFO - [elasticsearch_utils.py:73] - Retrieved 1 rules for service ID: 1

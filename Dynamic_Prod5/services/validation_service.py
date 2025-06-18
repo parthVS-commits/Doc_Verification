@@ -578,7 +578,7 @@ class DocumentValidationService:
                 print("✅ All validations passed")
                     
             print("\nDetailed results saved to detailed_validation_results.json")
-            print(detailed_result["document_validation"]["companyDocuments"]["addressProof"]["error_messages"])
+            #print(detailed_result["document_validation"]["companyDocuments"]["addressProof"]["error_messages"])
             return standard_result, detailed_result
             
         except Exception as e:

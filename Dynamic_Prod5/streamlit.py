@@ -163,6 +163,7 @@ for i in range(num_directors):
 
 st.subheader("Company Documents")
 address_proof_type = st.selectbox("Select Address Proof Type",options=["Electricity Bill", "NOC", "Gas Bill"])
+addressProof = encode_file(st.file_uploader("Company Address Proof"))
 noc = encode_file(st.file_uploader("NOC Document"))
 
 if st.button("Validate Documents"):

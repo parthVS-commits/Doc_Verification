@@ -672,3 +672,4 @@
 2025-06-18 10:31:33,880 - document_validation - INFO - [elasticsearch_utils.py:73] - Retrieved 1 rules for service ID: 1
 2025-06-18 10:32:25,351 - document_validation - INFO - [elasticsearch_utils.py:35] - Elasticsearch connection established successfully
 2025-06-18 10:32:26,912 - document_validation - INFO - [elasticsearch_utils.py:73] - Retrieved 1 rules for service ID: 1
+2025-06-18 11:15:30,966 - document_validation - ERROR - [elasticsearch_utils.py:32] - Elasticsearch connection failed

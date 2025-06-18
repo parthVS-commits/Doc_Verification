@@ -573,11 +573,11 @@ class DocumentValidationService:
                 for error in company_docs_validation["validation_errors"]:
                     print(f"❌ {error}")
                     errors_found = True
-            print(company_docs_validation["addressProof"]["error_messages"])
+            #print(company_docs_validation["addressProof"]["error_messages"])
             if not errors_found:
                 print("✅ All validations passed")
                     
-            print("\nDetailed results saved to detailed_validation_results.json")
+            #print("\nDetailed results saved to detailed_validation_results.json")
             #print(detailed_result["document_validation"]["companyDocuments"]["addressProof"]["error_messages"])
             return standard_result, detailed_result
             

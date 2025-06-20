@@ -154,10 +154,7 @@ def display_results(response_data,_):
         file_name="validation_results.json",
         mime="application/json"
     )
-# st.subheader("🔐 Debug Secrets (temp)")
-# st.text(f"Host: {os.getenv('ELASTICSEARCH_HOST')}")
-# st.text(f"User: {os.getenv('ELASTICSEARCH_USERNAME')}")
-# st.text(f"Pass Set: {'Yes' if os.getenv('ELASTICSEARCH_PASSWORD') else 'No'}")
+
 
 service_id = st.text_input("Service ID", value="1")
 request_id = st.text_input("Request ID", value="req-12345")
@@ -216,4 +213,3 @@ if st.button("Validate Documents"):
             st.json(api_response)
     except Exception as e:
         st.error(f"🚨 Validation Error: {str(e)}")
-

@@ -525,7 +525,7 @@ class DocumentValidationService:
             #     }
             # }
             standard_result = {
-                "validation_rules": self._prepare_validation_rules(directors_validation, company_docs_validation, compliance_rules),
+                "validation_rules": self._prepare_detailed_validation_rules(directors_validation, company_docs_validation, compliance_rules),
                 "document_validation": {
                     "directors": directors_validation,
                     "companyDocuments": company_docs_validation                    }
@@ -577,7 +577,7 @@ class DocumentValidationService:
             if not errors_found:
                 print("✅ All validations passed")
                     
-            #print("\nDetailed results saved to detailed_validation_results.json")
+            print("\nDetailed results saved to detailed_validation_results.json")
             #print(detailed_result["document_validation"]["companyDocuments"]["addressProof"]["error_messages"])
             return standard_result, detailed_result
             
@@ -752,10 +752,29 @@ class DocumentValidationService:
                     rule_validations = director_info.get('rule_validations', {})
                     for rule_id, rule_result in rule_validations.items():
                         api_rule_id = rule_id_mapping.get(rule_id.lower(), rule_id.lower())
-                        validation_defaults[api_rule_id] = {
-                            "status": rule_result.get('status', 'failed').lower(),
-                            "error_message": rule_result.get('error_message')
-                        }
+                        # validation_defaults[api_rule_id] = {
+                        #     "status": rule_result.get('status', 'failed').lower(),
+                        #     "error_message": rule_result.get('error_message')
+                        # }
+                        if isinstance(rule_result, list):
+                            failed = [r for r in rule_result if r.get("status") != "passed"]
+                            if failed:
+                                combined_msg = "; ".join(f"{r['director']}: {r['error_message']}" for r in failed)
+                                validation_defaults[api_rule_id] = {
+                                    "status": "failed",
+                                    "error_message": combined_msg
+                                }
+                            else:
+                                validation_defaults[api_rule_id] = {
+                                    "status": "passed",
+                                    "error_message": None
+                                }
+                        elif isinstance(rule_result, dict):
+                            validation_defaults[api_rule_id] = {
+                                "status": rule_result.get('status', 'failed').lower(),
+                                "error_message": rule_result.get('error_message')
+                            }
+
         
         # Get validation errors from company documents
         if isinstance(company_docs_validation, dict):
@@ -820,49 +839,214 @@ class DocumentValidationService:
         
         return validation_defaults
 
+    # def _prepare_detailed_validation_rules(self, directors_validation, company_docs_validation, compliance_rules):
+    #     """
+    #     Generate detailed validation rule information with conditions and evaluation
+
+    #     Args:
+    #         directors_validation (dict): Full validation results of directors
+    #         company_docs_validation (dict): Company documents validation
+    #         compliance_rules (dict): Full compliance rules
+
+    #     Returns:
+    #         dict: Detailed rule evaluation
+    #     """
+    #     validation_rules = {}
+    #     rules = compliance_rules.get('rules', [])
+
+    #     rule_result_map = {}
+
+    #     # Gather all rule validations from directors
+    #     if isinstance(directors_validation, dict):
+    #         for key, value in directors_validation.items():
+    #             if key in ['global_errors', 'rule_validations']:
+    #                 continue
+    #             if isinstance(value, dict):
+    #                 rule_validations = value.get('rule_validations', {})
+    #                 if isinstance(rule_validations, dict):
+    #                     for rule_id, rule_result in rule_validations.items():
+    #                         if rule_id not in rule_result_map:
+    #                             rule_result_map[rule_id] = []
+    #                         if isinstance(rule_result, dict):
+    #                             rule_result_map[rule_id].append({
+    #                                 "director": key,
+    #                                 "status": rule_result.get("status", "failed"),
+    #                                 "error_message": rule_result.get("error_message")
+    #                             })
+    #                         else:
+    #                             self.logger.warning(f"Invalid rule_result format for {rule_id} of {key}: {type(rule_result)}")
+        
+    #         # Global validations
+    #         shared_rules = directors_validation.get("rule_validations", {})
+    #         if isinstance(shared_rules, dict):
+    #             for rule_id, rule_result in shared_rules.items():
+    #                 if isinstance(rule_result, dict):
+    #                     rule_result_map[rule_id] = rule_result
+    #                 else:
+    #                     self.logger.warning(f"Invalid global rule_result format for {rule_id}: {type(rule_result)}")
+
+    #     # Company document validations
+    #     if isinstance(company_docs_validation, dict):
+    #         if "noc_validation" in company_docs_validation:
+    #             rule_result_map["noc_validation"] = company_docs_validation["noc_validation"]
+    #         if "noc_owner_validation" in company_docs_validation:
+    #             rule_result_map["noc_owner_validation"] = company_docs_validation["noc_owner_validation"]
+    #         if "addressProof" in company_docs_validation:
+    #             addr_errors = company_docs_validation["addressProof"].get("error_messages", [])
+    #             if addr_errors:
+    #                 rule_result_map["company_address_proof"] = {
+    #                     "status": "failed",
+    #                     "error_message": addr_errors[0]
+    #                 }
+    #         if "validation_errors" in company_docs_validation and "company_address_proof" not in rule_result_map:
+    #             errors = company_docs_validation.get("validation_errors", [])
+    #             if any("address proof" in e.lower() for e in errors):
+    #                 rule_result_map["company_address_proof"] = {
+    #                     "status": "failed",
+    #                     "error_message": errors[0]
+    #                 }
+
+    #     # Build final rule response
+    #     for rule in rules:
+    #         rule_id = rule.get("rule_id", "").lower()
+    #         rule_result = rule_result_map.get(rule_id)
+
+    #         if isinstance(rule_result, list):
+    #             failed = [r for r in rule_result if r.get("status") != "passed"]
+    #             status = "failed" if failed else "passed"
+    #             error_message = "; ".join(
+    #                 f"{r['director']}: {r['error_message']}" for r in failed if r.get("error_message")
+    #             ) or None
+    #             details = rule_result
+    #         elif isinstance(rule_result, dict):
+    #             status = rule_result.get('status', 'failed')
+    #             error_message = rule_result.get('error_message')
+    #             details = rule_result
+    #         else:
+    #             status = "passed"
+    #             error_message = None
+    #             details = None
+
+    #         validation_rules[rule_id] = {
+    #             "rule_id": rule.get('rule_id'),
+    #             "rule_name": rule.get('rule_name'),
+    #             "description": rule.get('description'),
+    #             "severity": rule.get('severity', 'medium'),
+    #             "is_active": rule.get('is_active', True),
+    #             "conditions": rule.get('conditions', {}),
+    #             "status": status,
+    #             "error_message": error_message,
+    #             "details": details
+    #         }
+
+    #     return validation_rules
+
     def _prepare_detailed_validation_rules(self, directors_validation, company_docs_validation, compliance_rules):
         """
-        Prepare detailed validation rules dynamically
-        
+        Generate detailed validation rule information with conditions and evaluation
+
         Args:
-            directors_validation (dict or list): Directors validation results
-            company_docs_validation (dict): Company documents validation results
-            compliance_rules (dict): Compliance rules for the service
-        
+            directors_validation (dict): Full validation results of directors
+            company_docs_validation (dict): Company documents validation
+            compliance_rules (dict): Full compliance rules
+
         Returns:
-            dict: Detailed validation rules with compliance information
+            dict: Detailed rule evaluation
         """
-        # Ensure directors_validation is a dictionary
-        if isinstance(directors_validation, list):
-            directors_validation = {str(idx): info for idx, info in enumerate(directors_validation)}
-        
-        # Extract rules from compliance rules
-        rules = compliance_rules.get('rules', [])
-        
         validation_rules = {}
-        
-        # Process rules with their original details
+        rules = compliance_rules.get('rules', [])
+
+        rule_result_map = {}
+
+        # Gather all rule validations from directors
+        if isinstance(directors_validation, dict):
+            for key, value in directors_validation.items():
+                if key in ['global_errors', 'rule_validations']:
+                    continue
+                if isinstance(value, dict):
+                    rule_validations = value.get('rule_validations', {})
+                    if isinstance(rule_validations, dict):
+                        for rule_id, rule_result in rule_validations.items():
+                            if rule_id not in rule_result_map:
+                                rule_result_map[rule_id] = []
+                            rule_result_map[rule_id].append({
+                                "director": key,
+                                "status": rule_result.get("status", "failed"),
+                                "error_message": rule_result.get("error_message")
+                            })
+
+            # Global/shared validations
+            shared_rules = directors_validation.get("rule_validations", {})
+            if isinstance(shared_rules, dict):
+                for rule_id, rule_result in shared_rules.items():
+                    if rule_id not in rule_result_map:
+                        rule_result_map[rule_id] = []
+                    rule_result_map[rule_id].append({
+                        "director": "all",
+                        "status": rule_result.get("status", "failed"),
+                        "error_message": rule_result.get("error_message")
+                    })
+
+        # Company document validations
+        if isinstance(company_docs_validation, dict):
+            if "noc_validation" in company_docs_validation:
+                rule_result_map["noc_validation"] = [{
+                    "director": "company",
+                    "status": company_docs_validation["noc_validation"].get("status", "failed"),
+                    "error_message": company_docs_validation["noc_validation"].get("error_message")
+                }]
+            elif "noc" in company_docs_validation:
+                noc_errors = company_docs_validation["noc"].get("error_messages", [])
+                if noc_errors:
+                    rule_result_map["noc_validation"] = [{
+                        "director": "company",
+                        "status": "failed",
+                        "error_message": noc_errors[0]
+                    }]
+            if "noc_owner_validation" in company_docs_validation:
+                rule_result_map["noc_owner_validation"] = [{
+                    "director": "company",
+                    "status": company_docs_validation["noc_owner_validation"].get("status", "failed"),
+                    "error_message": company_docs_validation["noc_owner_validation"].get("error_message")
+                }]
+            if "addressProof" in company_docs_validation:
+                addr_errors = company_docs_validation["addressProof"].get("error_messages", [])
+                if addr_errors:
+                    rule_result_map["company_address_proof"] = [{
+                        "director": "company",
+                        "status": "failed",
+                        "error_message": addr_errors[0]
+                    }]
+            if "validation_errors" in company_docs_validation and "company_address_proof" not in rule_result_map:
+                errors = company_docs_validation.get("validation_errors", [])
+                if any("address proof" in e.lower() for e in errors):
+                    rule_result_map["company_address_proof"] = [{
+                        "director": "company",
+                        "status": "failed",
+                        "error_message": errors[0]
+                    }]
+
+        # Build final validation summary
         for rule in rules:
-            rule_id = rule.get('rule_id', '').lower()
-            
-            # Determine rule result based on rule type
-            if any(company_rule in rule_id for company_rule in ['company_address_proof', 'noc_validation', 'noc_owner_validation']):
-                # Use company documents validation
-                rule_result = company_docs_validation.get(rule_id, {})
+            rule_id = rule.get("rule_id", "").lower()
+            rule_result = rule_result_map.get(rule_id, [])
+
+            if isinstance(rule_result, list):
+                failed = [r for r in rule_result if r.get("status") != "passed"]
+                status = "failed" if failed else "passed"
+                error_message = "; ".join(
+                    f"{r['director']}: {r['error_message']}" for r in failed if r.get("error_message")
+                ) or None
+                details = rule_result
+            elif isinstance(rule_result, dict):  # fallback, rarely used now
+                status = rule_result.get("status", "failed")
+                error_message = rule_result.get("error_message")
+                details = [rule_result]
             else:
-                # Look for rule result in directors validation
-                try:
-                    rule_result = next(
-                        (director.get('rule_validations', {}).get(rule_id, {}) 
-                        for director in directors_validation.values() 
-                        if isinstance(director, dict) and rule_id in director.get('rule_validations', {})), 
-                        {}
-                    )
-                except AttributeError:
-                    self.logger.warning(f"Invalid director data structure for rule {rule_id}")
-                    rule_result = {}
-            
-            # Prepare detailed rule information
+                status = "passed"
+                error_message = None
+                details = []
+
             validation_rules[rule_id] = {
                 "rule_id": rule.get('rule_id'),
                 "rule_name": rule.get('rule_name'),
@@ -870,12 +1054,83 @@ class DocumentValidationService:
                 "severity": rule.get('severity', 'medium'),
                 "is_active": rule.get('is_active', True),
                 "conditions": rule.get('conditions', {}),
-                "status": rule_result.get('status', 'failed'),
-                "error_message": rule_result.get('error_message'),
-                "details": rule_result
+                "status": status,
+                "error_message": error_message,
+                "details": details
             }
-        
+
         return validation_rules
+    
+
+    # def _prepare_detailed_validation_rules(self, directors_validation, company_docs_validation, compliance_rules):
+    #     """
+    #     Prepare detailed validation rules dynamically
+        
+    #     Args:
+    #         directors_validation (dict or list): Directors validation results
+    #         company_docs_validation (dict): Company documents validation results
+    #         compliance_rules (dict): Compliance rules for the service
+        
+    #     Returns:
+    #         dict: Detailed validation rules with compliance information
+    #     """
+    #     # Ensure directors_validation is a dictionary
+    #     if isinstance(directors_validation, list):
+    #         directors_validation = {str(idx): info for idx, info in enumerate(directors_validation)}
+        
+    #     # Extract rules from compliance rules
+    #     rules = compliance_rules.get('rules', [])
+        
+    #     validation_rules = {}
+        
+    #     # Process rules with their original details
+    #     for rule in rules:
+    #         rule_id = rule.get('rule_id', '').lower()
+            
+    #         # Determine rule result based on rule type
+    #         if any(company_rule in rule_id for company_rule in ['company_address_proof', 'noc_validation', 'noc_owner_validation']):
+    #             # Use company documents validation
+    #             rule_result = company_docs_validation.get(rule_id, {})
+    #         else:
+    #             # Look for rule result in directors validation
+    #             try:
+    #                 rule_result = next(
+    #                     (director.get('rule_validations', {}).get(rule_id, {}) 
+    #                     for director in directors_validation.values() 
+    #                     if isinstance(director, dict) and rule_id in director.get('rule_validations', {})), 
+    #                     {}
+    #                 )
+    #             except AttributeError:
+    #                 self.logger.warning(f"Invalid director data structure for rule {rule_id}")
+    #                 rule_result = {}
+    #         # Compute status and error_message correctly
+    #         if isinstance(rule_result, list):
+    #             failed = [r for r in rule_result if r.get("status") != "passed"]
+    #             status = "failed" if failed else "passed"
+    #             error_message = "; ".join(
+    #                 f"{r['director']}: {r['error_message']}" for r in failed if r.get("error_message")
+    #             ) or None
+    #         elif isinstance(rule_result, dict):
+    #             status = rule_result.get('status', 'failed')
+    #             error_message = rule_result.get('error_message')
+    #         else:
+    #             status = "failed"
+    #             error_message = "Invalid rule result format"
+
+    #         # Prepare detailed rule information
+    #         validation_rules[rule_id] = {
+    #             "rule_id": rule.get('rule_id'),
+    #             "rule_name": rule.get('rule_name'),
+    #             "description": rule.get('description'),
+    #             "severity": rule.get('severity', 'medium'),
+    #             "is_active": rule.get('is_active', True),
+    #             "conditions": rule.get('conditions', {}),
+    #             "status": status,
+    #             "error_message": error_message,
+    #             "details": rule_result
+    #         }
+        
+    #     return validation_rules
     
     def _validate_noc_owner_name_rule(self, company_docs_validation, conditions, preconditions=None):
         """
@@ -954,22 +1209,7 @@ class DocumentValidationService:
             "error_message": None
         }
 
-    def _validate_directors(
-        self, 
-        directors: Dict,
-        compliance_rules: Dict
-    ) -> Dict:
-        """
-        Comprehensive validation of all directors
-        
-        Args:
-            directors (dict): Directors to validate
-            compliance_rules (dict): Compliance rules to apply
-        
-        Returns:
-            dict: Detailed validation results for all directors
-        """
-        # Validate input types
+    def _validate_directors(self, directors: Dict, compliance_rules: Dict) -> Dict:
         if not isinstance(directors, dict):
             error_msg = f"Invalid directors input. Expected dict, got {type(directors)}"
             self.logger.error(error_msg)
@@ -979,83 +1219,137 @@ class DocumentValidationService:
                 "director_errors": {},
                 "raw_input": str(directors)
             }
-        
-        # Extract rules
+
         rules = self._extract_rules_from_compliance_data(compliance_rules)
-        
-        # Prepare validation results
         validation_results = {}
         global_errors = []
         rule_validations = {}
-        
-        # Director count validation
-        director_count_rule = next(
-            (rule for rule in rules if rule.get('rule_id') == 'DIRECTOR_COUNT'), 
-            None
-        )
-        
+
+        # Director count rule
+        director_count_rule = next((r for r in rules if r.get('rule_id') == 'DIRECTOR_COUNT'), None)
         if director_count_rule:
-            conditions = director_count_rule.get('conditions', {})
-            min_directors = conditions.get('min_directors', 2)
-            max_directors = conditions.get('max_directors', 5)
-            
-            director_count = len(directors)
-            if director_count < min_directors:
-                error_msg = f"Insufficient directors. Found {director_count}, minimum required is {min_directors}."
-                global_errors.append(error_msg)
-                rule_validations['director_count'] = {
-                    "status": "failed",
-                    "error_message": error_msg
-                }
-            elif director_count > max_directors:
-                error_msg = f"Too many directors. Found {director_count}, maximum allowed is {max_directors}."
-                global_errors.append(error_msg)
-                rule_validations['director_count'] = {
-                    "status": "failed",
-                    "error_message": error_msg
-                }
+            min_directors = director_count_rule.get('conditions', {}).get('min_directors', 2)
+            max_directors = director_count_rule.get('conditions', {}).get('max_directors', 5)
+            count = len(directors)
+            if count < min_directors:
+                msg = f"Insufficient directors. Found {count}, minimum required is {min_directors}."
+                global_errors.append(msg)
+                rule_validations['director_count'] = {"status": "failed", "error_message": msg}
+            elif count > max_directors:
+                msg = f"Too many directors. Found {count}, maximum allowed is {max_directors}."
+                global_errors.append(msg)
+                rule_validations['director_count'] = {"status": "failed", "error_message": msg}
             else:
-                rule_validations['director_count'] = {
-                    "status": "passed",
-                    "error_message": None
-                }
-        
-        # Process directors in parallel
-        with ThreadPoolExecutor(max_workers=min(len(directors), 5)) as executor:
-            # Create futures for each director validation
-            future_to_director = {
-                executor.submit(self._validate_single_director, director_key, director_info, rules): director_key
-                for director_key, director_info in directors.items()
+                rule_validations['director_count'] = {"status": "passed", "error_message": None}
+
+        # Preprocess docs in parallel
+        processed_directors = {}
+        with ThreadPoolExecutor(max_workers=min(5, len(directors))) as executor:
+            futures = {
+                executor.submit(self._process_director_documents_parallel, info.get('documents', {})): key
+                for key, info in directors.items()
             }
-            
-            # Collect results as they complete
-            for future in as_completed(future_to_director):
-                director_key = future_to_director[future]
+            for future in as_completed(futures):
+                key = futures[future]
                 try:
-                    director_validation = future.result()
-                    
-                    # Store any rule validations from the director
-                    if 'rule_validations' in director_validation:
-                        for rule_id, rule_result in director_validation['rule_validations'].items():
-                            rule_validations[rule_id] = rule_result
-                    
-                    validation_results[director_key] = director_validation
-                
+                    processed_directors[key] = future.result()
                 except Exception as e:
-                    self.logger.error(f"Error processing director {director_key}: {str(e)}", exc_info=True)
-                    validation_results[director_key] = {
-                        "error": str(e),
-                        "is_valid": False,
-                        "validation_errors": [str(e)]
+                    self.logger.error(f"Doc processing error for {key}: {e}", exc_info=True)
+                    processed_directors[key] = {}
+
+        full_director_data = {
+            key: {
+                **info,
+                "documents": processed_directors.get(key, {})
+            }
+            for key, info in directors.items()
+        }
+
+        nationality_map = {
+            "indian": ["INDIAN_DIRECTOR_PAN", "INDIAN_DIRECTOR_AADHAR", "AADHAR_PAN_LINKAGE"],
+            "foreign": ["FOREIGN_DIRECTOR_DOCS"]
+        }
+        common_rules = ["PASSPORT_PHOTO", "SIGNATURE", "ADDRESS_PROOF"]
+
+        rule_method_map = {
+            "INDIAN_DIRECTOR_PAN": self._validate_indian_pan_rule,
+            "INDIAN_DIRECTOR_AADHAR": self._validate_indian_aadhar_rule,
+            "AADHAR_PAN_LINKAGE": self._validate_aadhar_pan_linkage_rule,
+            "FOREIGN_DIRECTOR_DOCS": self._validate_foreign_director_rule,
+            "PASSPORT_PHOTO": self._validate_passport_photo_rule,
+            "SIGNATURE": self._validate_signature_rule,
+            "ADDRESS_PROOF": self._validate_address_proof_rule
+        }
+
+        all_director_keys = list(full_director_data.keys())
+
+        for rule_id, method in rule_method_map.items():
+            applicable_keys = []
+            if rule_id in nationality_map['indian']:
+                applicable_keys = [k for k, v in full_director_data.items() if v.get("nationality", "").lower() == "indian"]
+            elif rule_id in nationality_map['foreign']:
+                applicable_keys = [k for k, v in full_director_data.items() if v.get("nationality", "").lower() == "foreign"]
+            elif rule_id in common_rules:
+                applicable_keys = all_director_keys
+
+            applicable_data = {k: full_director_data[k] for k in applicable_keys}
+            rule_conditions = next((r.get('conditions', {}) for r in rules if r.get('rule_id') == rule_id), {})
+
+            try:
+                result = method(applicable_data, rule_conditions)
+                if result["status"] == "failed" and isinstance(result.get("details"), list):
+                    for failure in result["details"]:
+                        director_key = failure["director"]
+                        if director_key not in validation_results:
+                            validation_results[director_key] = {
+                                "nationality": full_director_data[director_key].get("nationality", "Unknown"),
+                                "is_authorised": full_director_data[director_key].get("authorised", "No") == "Yes",
+                                "documents": full_director_data[director_key].get("documents", {}),
+                                "validation_errors": [],
+                                "rule_validations": {}
+                            }
+                        validation_results[director_key]["rule_validations"][rule_id.lower()] = {
+                            "status": "failed",
+                            "error_message": failure.get("error_message")
+                        }
+                        validation_results[director_key]["validation_errors"].append(failure.get("error_message"))
+
+                elif result["status"] == "passed":
+                    for k in applicable_keys:
+                        if k not in validation_results:
+                            validation_results[k] = {
+                                "nationality": full_director_data[k].get("nationality", "Unknown"),
+                                "is_authorised": full_director_data[k].get("authorised", "No") == "Yes",
+                                "documents": full_director_data[k].get("documents", {}),
+                                "validation_errors": [],
+                                "rule_validations": {}
+                            }
+                        validation_results[k]["rule_validations"][rule_id.lower()] = {
+                            "status": "passed",
+                            "error_message": None
+                        }
+
+            except Exception as e:
+                self.logger.error(f"Error applying rule {rule_id}: {e}", exc_info=True)
+                for k in applicable_keys:
+                    validation_results.setdefault(k, {"rule_validations": {}, "validation_errors": []})
+                    validation_results[k]["rule_validations"][rule_id.lower()] = {
+                        "status": "failed",
+                        "error_message": str(e)
                     }
-        
-        # Add global errors if any
+                    validation_results[k]["validation_errors"].append(str(e))
+
+        for key in validation_results:
+            errors = validation_results[key].get("validation_errors", [])
+            validation_results[key]["is_valid"] = len(errors) == 0
+
         if global_errors:
             validation_results['global_errors'] = global_errors
-        
-        # Add rule validations to the overall results
-        validation_results['rule_validations'] = rule_validations
-        
+        if rule_validations:
+            validation_results['rule_validations'] = rule_validations
+        # print("----------------------------------------------")
+        # print(f"Validation results: {validation_results}")
+        # print("----------------------------------------------")
         return validation_results
 
 
@@ -1146,8 +1440,16 @@ class DocumentValidationService:
                     )
                     
                     # Store the rule validation result
-                    rule_validations[rule_id.lower()] = result
-                    
+                    #rule_validations[rule_id.lower()] = result
+                    if rule_id.lower() not in rule_validations:
+                        rule_validations[rule_id.lower()] = []
+
+                    rule_validations[rule_id.lower()].append({
+                        "director": director_key,
+                        "status": result.get("status"),
+                        "error_message": result.get("error_message")
+                    })
+
                     # Collect errors if validation fails
                     if result.get('status') != 'passed':
                         validation_errors.append(
@@ -1542,29 +1844,57 @@ class DocumentValidationService:
             
             validation_result = {}
             # validation_errors = []
+            # doc_specific_errors = {
+            #     "addressProof": [],
+            #     "noc": [],
+            # }
             addprf_error = []
             noc_error = []
             # Use ThreadPoolExecutor for parallel processing of company documents
             with ThreadPoolExecutor(max_workers=2) as executor:
                 # Submit address proof task
                 address_proof_future = None
-                if 'addressProof' in company_docs:
-                    address_proof_input = company_docs.get('addressProof')
-                    if address_proof_input:
-                        try:
-                            if address_proof_input.startswith("http://") or address_proof_input.startswith("https://"):
-                                source = address_proof_input
-                            else:
-                                source = self._save_base64_to_tempfile(address_proof_input, "pdf")
+                address_proof_input = company_docs.get('addressProof')
+                if not address_proof_input:
+                    addprf_error.append("Company Address Proof not uploaded")
+                    validation_result["addressProof"] = {
+                        "url": None,
+                        "is_valid": False,
+                        "status": "Failed",
+                        "error_messages": addprf_error
+                    }
+                else:
+                    try:
+                        if address_proof_input.startswith("http://") or address_proof_input.startswith("https://"):
+                            source = address_proof_input
+                        else:
+                            source = self._save_base64_to_tempfile(address_proof_input, "pdf")
+                        address_proof_future = executor.submit(
+                            self.extraction_service.extract_document_data,
+                            source,
+                            'address_proof'
+                        )
+                    except Exception as e:
+                        self.logger.error(f"Failed to process addressProof input: {e}")
+                        addprf_error.append(f"Failed to process address proof: {str(e)}")
+
+                # if 'addressProof' in company_docs:
+                #     address_proof_input = company_docs.get('addressProof')
+                #     if address_proof_input:
+                #         try:
+                #             if address_proof_input.startswith("http://") or address_proof_input.startswith("https://"):
+                #                 source = address_proof_input
+                #             else:
+                #                 source = self._save_base64_to_tempfile(address_proof_input, "pdf")
                             
-                            address_proof_future = executor.submit(
-                                self.extraction_service.extract_document_data,
-                                source,
-                                'address_proof'
-                            )
-                        except Exception as e:
-                            self.logger.error(f"Failed to process addressProof input: {e}")
-                            addprf_error.append(f"Failed to process address proof: {str(e)}")
+                #             address_proof_future = executor.submit(
+                #                 self.extraction_service.extract_document_data,
+                #                 source,
+                #                 'address_proof'
+                #             )
+                #         except Exception as e:
+                #             self.logger.error(f"Failed to process addressProof input: {e}")
+                #             addprf_error.append(f"Failed to process address proof: {str(e)}")
 
                 # address_proof_future = None
                 # if 'addressProof' in company_docs:
@@ -1589,23 +1919,47 @@ class DocumentValidationService:
 
                 # Submit noc task
                 noc_future = None
-                if 'noc' in company_docs:
-                    noc_input = company_docs.get('noc')
-                    if noc_input:
-                        try:
-                            if noc_input.startswith("http://") or noc_input.startswith("https://"):
-                                source = noc_input
-                            else:
-                                source = self._save_base64_to_tempfile(noc_input, "pdf")
+                noc_input = company_docs.get('noc')
+                if not noc_input:
+                    noc_error.append("NOC not uploaded")
+                    validation_result["noc"] = {
+                        "source": None,
+                        "is_valid": False,
+                        "status": "Failed",
+                        "error_messages": noc_error
+                    }
+                else:
+                    try:
+                        if noc_input.startswith("http://") or noc_input.startswith("https://"):
+                            source = noc_input
+                        else:
+                            source = self._save_base64_to_tempfile(noc_input, "pdf")
+                        noc_future = executor.submit(
+                            self.extraction_service.extract_document_data,
+                            source,
+                            'noc'
+                        )
+                    except Exception as e:
+                        self.logger.error(f"Failed to process noc input: {e}")
+                        noc_error.append(f"Failed to process NOC: {str(e)}")
+
+                # if 'noc' in company_docs:
+                #     noc_input = company_docs.get('noc')
+                #     if noc_input:
+                #         try:
+                #             if noc_input.startswith("http://") or noc_input.startswith("https://"):
+                #                 source = noc_input
+                #             else:
+                #                 source = self._save_base64_to_tempfile(noc_input, "pdf")
                             
-                            noc_future = executor.submit(
-                                self.extraction_service.extract_document_data,
-                                source,
-                                'noc'
-                            )
-                        except Exception as e:
-                            self.logger.error(f"Failed to process noc input: {e}")
-                            noc_error.append(f"Failed to process NOC: {str(e)}")
+                #             noc_future = executor.submit(
+                #                 self.extraction_service.extract_document_data,
+                #                 source,
+                #                 'noc'
+                #             )
+                #         except Exception as e:
+                #             self.logger.error(f"Failed to process noc input: {e}")
+                #             noc_error.append(f"Failed to process NOC: {str(e)}")
 
                 
                 # Process address proof result
@@ -1669,7 +2023,9 @@ class DocumentValidationService:
                                         addprf_error.append(f"Error validating address proof date: {str(e)}")
                         else:
                             addprf_error.append("Address proof data extraction failed")
-              
+                        # validation_result["addressProof"]["is_valid"] = not any(
+                        #     err.lower().startswith("address proof") for err in doc_specific_errors["addressProof"]
+                        # )
                         validation_result["addressProof"]["is_valid"] = len(addprf_error) == 0
 
                     except Exception as e:
@@ -1732,7 +2088,10 @@ class DocumentValidationService:
                                 noc_error.append("NOC does not contain a valid signature")
                                 is_noc_valid = False
 
-                  
+                        # validation_result["noc"]["is_valid"] = is_noc_valid
+                        # validation_result["noc"]["is_valid"] = not any(
+                        #     err.lower().startswith("noc") for err in doc_specific_errors["noc"]
+                        # )
                         validation_result["noc"]["is_valid"] = len(noc_error) == 0
 
 
@@ -2042,164 +2401,280 @@ class DocumentValidationService:
             "status": "passed",
             "error_message": None
         }
+    
+    def _validate_passport_photo_rule(self, directors_validation: Dict, conditions: Dict) -> Dict:
+        """
+        Validate passport photo for all directors.
 
-    def _validate_passport_photo_rule(self, directors_validation, conditions):
-        """
-        Validate passport photo rule with more leniency
-        
         Args:
-            directors_validation (dict): Directors validation data
-            conditions (dict): Rule conditions
-        
+            directors_validation (dict): All directors' validation data.
+            conditions (dict): Rule-specific conditions.
+
         Returns:
-            dict: Validation result
+            dict: Rule result with overall status, message, and per-director details.
         """
-        # Safely process directors validation
+        failed_directors = []
         safe_directors = self._safe_validate_directors(directors_validation)
-        
         # Get conditions with more leniency
         min_clarity_score = conditions.get('min_clarity_score', 0.1)  # Lower threshold
         require_passport_style = conditions.get('is_passport_style', False)  # Make optional
         require_face_visible = conditions.get('face_visible', True)  # Keep this requirement
-        
-        # Check each director
+            
         for director_key, director_info in safe_directors.items():
-            documents = director_info.get('documents', {})
-            passport_photo = documents.get('passportPhoto', {})
-            
-            # Skip if no passport photo
+            if not isinstance(director_info, dict):
+                continue
+
+            documents = director_info.get("documents", {})
+            passport_photo = documents.get("passportPhoto", {})
+
             if not passport_photo:
-                self.logger.warning(f"No passport photo found for {director_key}")
+                failed_directors.append({
+                    "director": director_key,
+                    "status": "failed",
+                    "error_message": f"Passport photo not uploaded for {director_key}"
+                })
                 continue
-            
-            # If extraction failed, be lenient
-            if not passport_photo.get('is_valid', False):
-                self.logger.warning(f"Passport photo extraction issues for {director_key}, but proceeding with validation")
+
+            if not passport_photo.get("is_valid", False):
+                failed_directors.append({
+                    "director": director_key,
+                    "status": "failed",
+                    "error_message": f"Invalid passport photo for {director_key}"
+                })
                 continue
-                
             # Get extraction data
             extracted_data = passport_photo.get('extracted_data', {})
             
             # Only check face visibility as a strict requirement
             if require_face_visible and 'face_visible' in extracted_data:
                 if not extracted_data.get('face_visible', False):
-                    return {
+                    failed_directors.append({
+                        "director": director_key,
                         "status": "failed",
-                        "error_message": f"Face not clearly visible in photo for {director_key}"
-                    }
-        
-        # All directors pass the check
+                        "error_message": f"Face not clearly visible in passport photo for {director_key}"
+                    })
+
+        if failed_directors:
+            return {
+                "status": "failed",
+                "error_message": "; ".join(f"{d['director']}: {d['error_message']}" for d in failed_directors),
+                "details": failed_directors
+            }
+
         return {
             "status": "passed",
-            "error_message": None
+            "error_message": None,
+            "details": None
         }
+    
+    def _validate_signature_rule(self, directors_validation: Dict, conditions: Dict) -> Dict:
+        """
+        Validate signature documents for all directors with leniency.
 
-    def _validate_signature_rule(self, directors_validation, conditions):
-        """
-        Validate signature rule for all directors with more leniency
-        
         Args:
-            directors_validation (dict): Directors validation data
-            conditions (dict): Rule conditions
-        
+            directors_validation (dict): All directors' validation data.
+            conditions (dict): Rule-specific conditions.
+
         Returns:
-            dict: Validation result
+            dict: Rule result with overall status, message, and per-director details.
         """
-        # Safely process directors validation
         safe_directors = self._safe_validate_directors(directors_validation)
-        
-        # Get conditions with lower default thresholds for leniency
-        min_clarity_score = conditions.get('min_clarity_score', 0.1)  # Lower threshold
-        require_handwritten = conditions.get('is_handwritten', False)  # Make optional
-        require_complete = conditions.get('is_complete', False)  # Make optional
-        
-        # Check each director
+        min_clarity_score = 0.5 # conditions.get('min_clarity_score', 0.3)
+        require_handwritten = conditions.get('is_handwritten', True)
+        require_complete = conditions.get('is_complete', True)
+
+        failed_directors = []
+
         for director_key, director_info in safe_directors.items():
-            documents = director_info.get('documents', {})
-            signature = documents.get('signature', {})
-            
-            # Skip if no signature
+            if not isinstance(director_info, dict):
+                continue
+
+            documents = director_info.get("documents", {})
+            signature = documents.get("signature", {})
+
             if not signature:
-                # Just log a warning but don't fail
-                self.logger.warning(f"No signature document found for {director_key}")
+                failed_directors.append({
+                    "director": director_key,
+                    "status": "failed",
+                    "error_message": f"No signature uploaded for {director_key}"
+                })
                 continue
-            
-            # If extraction failed, be lenient
-            if not signature.get('is_valid', False):
-                self.logger.warning(f"Signature extraction issues for {director_key}, but proceeding with validation")
+
+            if not signature.get("is_valid", False):
+                failed_directors.append({
+                    "director": director_key,
+                    "status": "failed",
+                    "error_message": f"Signature extraction failed for {director_key}"
+                })
                 continue
-                
-            # Get extraction data
-            extracted_data = signature.get('extracted_data', {})
+
+            data = signature.get("extracted_data", {})
+            clarity_score = data.get("clarity_score", 0)
+            is_handwritten = data.get("is_handwritten", False)
+            is_complete = data.get("is_complete", False)
+
+            if clarity_score < min_clarity_score:
+                failed_directors.append({
+                    "director": director_key,
+                    "status": "failed",
+                    "error_message": f"Low clarity ({clarity_score:.2f}) for {director_key}, minimum is {min_clarity_score}"
+                })
+            elif require_handwritten and not is_handwritten:
+                failed_directors.append({
+                    "director": director_key,
+                    "status": "failed",
+                    "error_message": f"Signature not handwritten for {director_key}"
+                })
+            elif require_complete and not is_complete:
+                failed_directors.append({
+                    "director": director_key,
+                    "status": "failed",
+                    "error_message": f"Incomplete signature for {director_key}"
+                })
             
-            # Check clarity score if available
-            if 'clarity_score' in extracted_data:
-                clarity_score = float(extracted_data.get('clarity_score', 0))
-                if clarity_score < min_clarity_score:
-                    return {
-                        "status": "failed",
-                        "error_message": f"Signature for {director_key} has insufficient clarity. Score: {clarity_score:.2f}, required: {min_clarity_score:.2f}"
-                    }
-        
-        # All directors pass the check
+        if failed_directors:
+            return {
+                "status": "failed",
+                "error_message": "; ".join(d["error_message"] for d in failed_directors),
+                "details": failed_directors
+            }
+
         return {
             "status": "passed",
-            "error_message": None
+            "error_message": None,
+            "details": None
         }
 
-    def _validate_address_proof_rule(self, directors_validation, conditions):
-        """
-        Validate address proof rule with improved date detection
+    # def _validate_signature_rule(self, directors_validation, conditions):
+    #     """
+    #     Validate signature rule for all directors with more leniency
         
+    #     Args:
+    #         directors_validation (dict): Directors validation data
+    #         conditions (dict): Rule conditions
+        
+    #     Returns:
+    #         dict: Validation result
+    #     """
+    #     # Safely process directors validation
+    #     safe_directors = self._safe_validate_directors(directors_validation)
+        
+    #     # Get conditions with lower default thresholds for leniency
+    #     min_clarity_score = conditions.get('min_clarity_score', 0.1)  # Lower threshold
+    #     require_handwritten = conditions.get('is_handwritten', False)  # Make optional
+    #     require_complete = conditions.get('is_complete', False)  # Make optional
+        
+    #     # Check each director
+    #     for director_key, director_info in safe_directors.items():
+    #         documents = director_info.get('documents', {})
+    #         signature = documents.get('signature', {})
+            
+    #         # Skip if no signature
+    #         if not signature:
+    #             # Just log a warning but don't fail
+    #             self.logger.warning(f"No signature document found for {director_key}")
+    #             continue
+            
+    #         # If extraction failed, be lenient
+    #         if not signature.get('is_valid', False):
+    #             self.logger.warning(f"Signature extraction issues for {director_key}, but proceeding with validation")
+    #             continue
+                
+    #         # Get extraction data
+    #         extracted_data = signature.get('extracted_data', {})
+            
+    #         # Check clarity score if available
+    #         if 'clarity_score' in extracted_data:
+    #             clarity_score = float(extracted_data.get('clarity_score', 0))
+    #             if clarity_score < min_clarity_score:
+    #                 return {
+    #                     "status": "failed",
+    #                     "error_message": f"Signature for {director_key} has low clarity ({clarity_score:.2f}), required: {min_clarity_score:.2f}"
+    #                 }
+
+
+    #     # All directors pass the check
+    #     return {
+    #         "status": "passed",
+    #         "error_message": None
+    #     }
+
+    def _validate_address_proof_rule(self, directors_validation: Dict, conditions: Dict) -> Dict:
+        """
+        Validate address proof documents for all directors.
+
         Args:
-            directors_validation (dict): Directors validation data
-            conditions (dict): Rule conditions
-        
+            directors_validation (dict): All directors' validation data.
+            conditions (dict): Rule-specific conditions.
+
         Returns:
-            dict: Validation result
+            dict: Rule result with status, error_message, and details.
         """
-        # Safely process directors validation
-        safe_directors = self._safe_validate_directors(directors_validation)
-        
-        # Get conditions
         max_age_days = conditions.get('max_age_days', 45)
         name_match_required = conditions.get('name_match_required', True)
-        complete_address_required = conditions.get('complete_address_required', True)
-        
-        # Check each director
+        complete_address_required = conditions.get('complete_address_required', True)    
+        failed_directors = []
+        safe_directors = self._safe_validate_directors(directors_validation)
+
         for director_key, director_info in safe_directors.items():
-            documents = director_info.get('documents', {})
-            address_proof = documents.get('address_proof', {})
-            
-            # Skip if no address proof
-            if not address_proof:
+            if not isinstance(director_info, dict):
                 continue
-            
-            # Get extraction data
-            extracted_data = address_proof.get('extracted_data', {})
-            
-            # Check document age
-            date_str = extracted_data.get('date') or extracted_data.get('bill_date')
-            if date_str:
+
+            documents = director_info.get("documents", {})
+            addr_doc = documents.get("address_proof", {})
+
+            if not addr_doc:
+                failed_directors.append({
+                    "director": director_key,
+                    "status": "failed",
+                    "error_message": f"No address proof uploaded for {director_key}"
+                })
+                continue
+
+            if not addr_doc.get("is_valid", False):
+                failed_directors.append({
+                    "director": director_key,
+                    "status": "failed",
+                    "error_message": f"Address proof extraction failed for {director_key}"
+                })
+                continue
+
+            extracted_data = addr_doc.get("extracted_data", {})
+            date_str = extracted_data.get("date") or extracted_data.get("bill_date")
+            if not date_str:
+                failed_directors.append({
+                    "director": director_key,
+                    "status": "failed",
+                    "error_message": f"Missing date in address proof for {director_key}"
+                })
+                continue
+
+            try:
                 doc_date = self._parse_date(date_str)
-                if doc_date:
-                    today = datetime.now()
-                    doc_age = (today - doc_date).days
-                    if doc_age > max_age_days:
-                        return {
-                            "status": "failed",
-                            "error_message": f"Address proof for {director_key} is {doc_age} days old (exceeds {max_age_days} days limit)"
-                        }
-            
-            # Check for complete address
+                if not doc_date:
+                    raise ValueError("Date parsing returned None")
+                doc_age = (datetime.now() - doc_date).days
+                if doc_age > max_age_days:
+                    failed_directors.append({
+                        "director": director_key,
+                        "status": "failed",
+                        "error_message": f"Address proof for {director_key} is {doc_age} days old (exceeds {max_age_days} days limit)"
+                    })
+            except Exception as e:
+                failed_directors.append({
+                    "director": director_key,
+                    "status": "failed",
+                    "error_message": f"Error parsing date for {director_key}: {str(e)}"
+                })
             if complete_address_required:
                 address = extracted_data.get('address', '')
                 if not address or len(address.strip()) < 10:
-                    return {
+                    failed_directors.append({
+                        "director": director_key,
                         "status": "failed",
                         "error_message": f"Address proof for {director_key} does not contain a complete address"
-                    }
-            
+                    })
+                            
             # Check name matching
             if name_match_required:
                 # Get director name from other documents
@@ -2207,62 +2682,87 @@ class DocumentValidationService:
                 address_name = extracted_data.get('name') or extracted_data.get('consumer_name')
                 
                 if director_name and address_name and not self._names_match(director_name, address_name):
-                    return {
+                    failed_directors.append({
+                        "director": director_key,
                         "status": "failed",
-                        "error_message": f"Address proof name for {director_key} does not match director name"
-                    }
-        
-        # All directors pass the check
+                        "error_message": f"Address proof name '{address_name}' for {director_key} does not match director name '{director_name}'"
+                    })
+                elif not director_name or not address_name:
+                    failed_directors.append({
+                        "director": director_key,
+                        "status": "failed",
+                        "error_message": f"Missing name in address proof for {director_key}"
+                    })
+                elif director_name != address_name:
+                    # If names do not match but are not required to match, log a warning
+                    self.logger.warning(f"Address proof name '{address_name}' for {director_key} does not match director name '{director_name}', but name matching is not required.")
+        # print("---------------------------------------")
+        # print(failed_directors)
+        # print("---------------------------------------")
+        # print("; ".join([d["error_message"] for d in failed_directors]))
+        # print("---------------------------------------")
+        if failed_directors:
+            return {
+                "status": "failed",
+                "error_message": "; ".join([d["error_message"] for d in failed_directors]),
+                "details": failed_directors
+            }
+
         return {
             "status": "passed",
-            "error_message": None
+            "error_message": None,
+            "details": None
         }
-    
-    def _validate_indian_pan_rule(self, directors_validation, conditions):
+
+
+    def _validate_indian_pan_rule(self, directors_validation: Dict, conditions: Dict) -> Dict:
         """
-        Validate PAN card for Indian directors
-        
+        Validate PAN for all Indian directors in one go.
+
         Args:
-            directors_validation (dict): Directors validation data
-            conditions (dict): Rule conditions
-        
+            directors_validation (dict): Validation data for all directors.
+            conditions (dict): PAN validation conditions (e.g., required format, length).
+
         Returns:
-            dict: Validation result
+            dict: Rule result with per-director failure details.
         """
+        failed_directors = []
+        min_age = conditions.get('min_age', 18)
         # Safely process directors validation
         safe_directors = self._safe_validate_directors(directors_validation)
-        
-        # Get conditions
-        min_age = conditions.get('min_age', 18)
-        
-        # Check each director
         for director_key, director_info in safe_directors.items():
-            # Only validate Indian directors
-            if director_info.get('nationality', '').lower() != 'indian':
+            if not isinstance(director_info, dict):
                 continue
-                
-            documents = director_info.get('documents', {})
-            pan_card = documents.get('panCard', {})
-            
-            # Check if PAN card is present
-            if not pan_card or not pan_card.get('is_valid', False):
-                return {
+
+            if director_info.get("nationality", "").lower() != "indian":
+                continue
+
+            documents = director_info.get("documents", {})
+            pan = documents.get("panCard", {})
+
+            if not pan or not pan.get("extracted_data"):
+                failed_directors.append({
+                    "director": director_key,
                     "status": "failed",
-                    "error_message": f"Valid PAN card required for Indian director {director_key}"
-                }
-            
-            # Get extraction data
-            extracted_data = pan_card.get('extracted_data', {})
-            
-            # Validate PAN number format
+                    "error_message": f"PAN card not uploaded or extraction failed for {director_key}"
+                })
+                continue
+            extracted_data = pan.get('extracted_data', {})
             pan_number = extracted_data.get('pan_number', '')
-            if not re.match(r'^[A-Z]{5}\d{4}[A-Z]{1}$', pan_number):
-                return {
+            if not pan_number:
+                failed_directors.append({
+                    "director": director_key,
                     "status": "failed",
-                    "error_message": f"Invalid PAN number format for {director_key}"
-                }
-            
-            # Check age if DOB is available
+                    "error_message": f"PAN number not found for {director_key}"
+                })
+                continue
+
+            if not re.match(r'^[A-Z]{5}\d{4}[A-Z]{1}$', pan_number):
+                failed_directors.append({
+                    "director": director_key,
+                    "status": "failed",
+                    "error_message": f"Invalid PAN format for {director_key}: {pan_number}"
+                })
             dob_str = extracted_data.get('dob')
             if dob_str:
                 dob_date = self._parse_date(dob_str)
@@ -2270,73 +2770,104 @@ class DocumentValidationService:
                     today = datetime.now()
                     age = today.year - dob_date.year - ((today.month, today.day) < (dob_date.month, dob_date.day))
                     if age < min_age:
-                        return {
+                        failed_directors.append({
+                            "director": director_key,
                             "status": "failed",
                             "error_message": f"Director {director_key} is {age} years old, below minimum age of {min_age}"
-                        }
-        
-        # All Indian directors pass the check
+                        })
+        if failed_directors:
+            return {
+                "status": "failed",
+                "error_message": "; ".join(f"{d['director']}: {d['error_message']}" for d in failed_directors),
+                "details": failed_directors
+            }
+
         return {
             "status": "passed",
-            "error_message": None
+            "error_message": None,
+            "details": None
         }
+
         
-    def _validate_indian_aadhar_rule(self, directors_validation, conditions):
+    def _validate_indian_aadhar_rule(self, directors_validation: Dict, conditions: Dict) -> Dict:
         """
-        Validate Aadhar card for Indian directors with improved image comparison
-        
+        Validate Aadhar card (front and back) for Indian directors.
+
         Args:
-            directors_validation (dict): Directors validation data
-            conditions (dict): Rule conditions
-        
+            directors_validation (dict): Full validation data for all directors.
+            conditions (dict): Rule-specific conditions (if any).
+
         Returns:
-            dict: Validation result
+            dict: Rule validation result with per-director error reporting.
         """
-        # Safely process directors validation
+        failed_directors = []
         safe_directors = self._safe_validate_directors(directors_validation)
-        
-        # Get conditions
         masked_not_allowed = conditions.get('masked_not_allowed', True)
         different_images_required = conditions.get('different_images_required', True)
-        
-        # Check each director
+            
         for director_key, director_info in safe_directors.items():
-            # Only validate Indian directors
+            if not isinstance(director_info, dict):
+                continue
+
             if director_info.get('nationality', '').lower() != 'indian':
                 continue
-                    
+
             documents = director_info.get('documents', {})
             aadhar_front = documents.get('aadharCardFront', {})
             aadhar_back = documents.get('aadharCardBack', {})
-            
-            # Check if both front and back are present
-            if not aadhar_front or not aadhar_back:
-                return {
+
+            missing_parts = []
+            if not aadhar_front or not aadhar_front.get("is_valid", False):
+                missing_parts.append("Aadhar front")
+            if not aadhar_back or not aadhar_back.get("is_valid", False):
+                missing_parts.append("Aadhar back")
+
+            if missing_parts:
+                failed_directors.append({
+                    "director": director_key,
                     "status": "failed",
-                    "error_message": f"Both Aadhar front and back required for Indian director {director_key}"
-                }
-            
-            # Check if both are valid
-            if not aadhar_front.get('is_valid', False) or not aadhar_back.get('is_valid', False):
-                return {
-                    "status": "failed",
-                    "error_message": f"Valid Aadhar front and back required for {director_key}"
-                }
-            
+                    "error_message": f"{', '.join(missing_parts)} is missing or invalid"
+                })
             # Advanced image comparison logic
             front_data = aadhar_front.get('extracted_data', {})
             back_data = aadhar_back.get('extracted_data', {})
-            
+            # Intelligent image comparison
+            # If no extracted data, we can't compare
+            if not front_data or not back_data:
+                failed_directors.append({
+                    "director": director_key,
+                    "status": "failed",
+                    "error_message": f"Missing extracted data for Aadhar front or back for {director_key}"
+                })
+                continue
             # Check for masked Aadhar
             if masked_not_allowed:
                 # Only check if both are masked - be more lenient
-                if front_data.get('is_masked', False) and back_data.get('is_masked', False):
-                    return {
+                # if front_data.get('is_masked', False) and back_data.get('is_masked', False):
+                #     failed_directors.append({
+                #         "director": director_key,
+                #         "status": "failed",
+                #         "error_message": f"Both Aadhar front and back are masked for {director_key}, need at least one unmasked"
+                #     })
+                #     continue  # Skip further checks for this director
+                
+                # If only one is masked, we can still proceed
+                if front_data.get('is_masked', False) and not back_data.get('is_masked', False):
+                    self.logger.warning(f"Aadhar front is masked for {director_key}, but back is unmasked")
+                elif back_data.get('is_masked', False) and not front_data.get('is_masked', False):
+                    self.logger.warning(f"Aadhar back is masked for {director_key}, but front is unmasked")
+                elif not front_data.get('is_masked', False) and not back_data.get('is_masked', False):
+                    self.logger.info(f"Both Aadhar front and back are unmasked for {director_key}")
+                else:
+                    # If both are masked, we fail the validation
+                    failed_directors.append({
+                        "director": director_key,
                         "status": "failed",
                         "error_message": f"Both Aadhar front and back are masked for {director_key}, need at least one unmasked"
-                    }
+                    })
+                    continue  # Skip further checks for this director
             
-            # Intelligent image comparison
+            
             # Compare key data points instead of just image URLs
             key_fields = ['name', 'dob', 'aadhar_number', 'gender']
             
@@ -2361,34 +2892,13 @@ class DocumentValidationService:
                 # If hashes are equal, assume same image
                 if front_hash and front_hash == back_hash:
                     if len(inconsistent_fields) > 1:
-                        return {
+                        failed_directors.append({
+                            "director": director_key,
                             "status": "failed",
                             "error_message": f"Same image used for Aadhar front and back for {director_key}"
-                        }
+                        })
+                        continue  # Skip further checks for this director
 
-                # front_url = aadhar_front.get('url', '')
-                # back_url = aadhar_back.get('url', '')
-                
-                # # Extract file ID from Google Drive URL
-                # def extract_google_drive_id(url):
-                #     if 'drive.google.com' in url:
-                #         match = re.search(r'/d/([a-zA-Z0-9_-]+)', url)
-                #         if match:
-                #             return match.group(1)
-                #     return url
-                
-                # front_id = extract_google_drive_id(front_url)
-                # back_id = extract_google_drive_id(back_url)
-                
-                # # If URLs are identical and we require different images
-                # if front_id == back_id:
-                #     # But allow if key information is consistent and not masked
-                #     if len(inconsistent_fields) > 1:
-                #         return {
-                #             "status": "failed",
-                #             "error_message": f"Same image used for Aadhar front and back for {director_key}"
-                #         }
-                    
                     # Log a warning about potential duplicate
                     self.logger.warning(f"Potential duplicate Aadhar images for {director_key}")
             
@@ -2396,73 +2906,78 @@ class DocumentValidationService:
             if inconsistent_fields:
                 self.logger.warning(f"Inconsistent Aadhar fields for {director_key}: {inconsistent_fields}")
         
-        # All directors pass the check
+        if failed_directors:
+            return {
+                    "status": "failed",
+                    "error_message": "; ".join(
+                        f"{d['director']}: {d['error_message']}" for d in failed_directors
+                    ),
+                    "details": failed_directors
+                }
+
         return {
             "status": "passed",
-            "error_message": None
+            "error_message": None,
+            "details": None
         }
     
-    def _validate_foreign_director_rule(self, directors_validation, conditions):
+
+    def _validate_foreign_director_rule(self, directors_validation: Dict, conditions: Dict) -> Dict:
         """
-        Validate documents for foreign directors
-        
+        Validate passport or driving license for all foreign directors.
+
         Args:
-            directors_validation (dict): Directors validation data
-            conditions (dict): Rule conditions
-        
+            directors_validation (dict): Full validation data for all directors.
+            conditions (dict): Rule-specific conditions (if any).
+
         Returns:
-            dict: Validation result
+            dict: Rule validation result with per-director error reporting.
         """
-        # Safely process directors validation
+        failed_directors = []
         safe_directors = self._safe_validate_directors(directors_validation)
-        
-        # Get conditions
         passport_required = conditions.get('passport_required', True)
-        passport_validity_check = conditions.get('passport_validity_check', True)
-        driving_license_required = conditions.get('driving_license_required', False)
-        
-        # For each foreign director
-        foreign_directors_found = False
-        
+
+            
         for director_key, director_info in safe_directors.items():
-            # Only validate foreign directors
+            if not isinstance(director_info, dict):
+                continue
+
             if director_info.get('nationality', '').lower() != 'foreign':
                 continue
-            
-            foreign_directors_found = True
+
             documents = director_info.get('documents', {})
-            
-            # First, check if foreign director has any valid ID document
-            # This could be a passport, driving license, or even a PAN card
-            if passport_required:
-                # First, look for explicit passport document
-                passport = documents.get('passport', {})
-                
-                # If no explicit passport, check if panCard can be treated as ID
-                if not passport or not passport.get('is_valid', False):
-                    # Check if panCard exists and is valid as alternative ID
-                    pan_card = documents.get('panCard', {})
-                    if not pan_card or not pan_card.get('is_valid', False):
-                        return {
-                            "status": "failed",
-                            "error_message": f"Valid ID document (passport or equivalent) required for foreign director {director_key}"
-                        }
-                    else:
-                        # PanCard is being used as ID document
-                        self.logger.info(f"Using PAN card as ID document for foreign director {director_key}")
-        
-        # If we found no foreign directors, pass this rule
-        if not foreign_directors_found:
+            passport = documents.get('passport', {})
+            driving_license = documents.get('drivingLicense', {})
+
+            has_passport = passport.get('is_valid', False)
+            has_license = driving_license.get('is_valid', False)
+
+            if not (has_passport or has_license):
+                # Check if panCard exists and is valid as alternative ID
+                pan_card = documents.get('panCard', {})
+                if not pan_card or not pan_card.get('is_valid', False):
+                    failed_directors.append({
+                        "director": director_key,
+                        "status": "failed",
+                        "error_message": "Passport or Driving License is required for foreign directors"
+                    })
+                else:
+                    # PanCard is being used as ID document
+                    self.logger.info(f"Using PAN card as ID document for foreign director {director_key}")
+
+        if failed_directors:
             return {
-                "status": "passed",
-                "error_message": None,
-                "details": "No foreign directors found requiring validation"
+                "status": "failed",
+                "error_message": "; ".join(
+                    f"{d['director']}: {d['error_message']}" for d in failed_directors
+                ),
+                "details": failed_directors
             }
-        
-        # All foreign directors pass the check
+
         return {
             "status": "passed",
-            "error_message": None
+            "error_message": None,
+            "details": None
         }
     
 
@@ -2599,11 +3114,11 @@ class DocumentValidationService:
         signature_required = conditions.get('signature_required', True)
         
         # If NOC is not required, pass automatically
-        if not noc_required:
-            return {
-                "status": "passed",
-                "error_message": None
-            }
+        # if not noc_required:
+        #     return {
+        #         "status": "passed",
+        #         "error_message": None
+        #     }
         
         # Check if NOC exists in company documents
         noc = company_docs_validation.get('noc', {})
@@ -2711,7 +3226,7 @@ class DocumentValidationService:
         """
         # Safely process directors validation
         safe_directors = self._safe_validate_directors(directors_validation)
-        
+        failed_directors = []
         # Check if linkage check is required
         linkage_api_check_required = conditions.get('linkage_api_check_required', True)
         if not linkage_api_check_required:
@@ -2735,11 +3250,20 @@ class DocumentValidationService:
             
             # Check if both documents exist
             if not aadhar_front and not aadhar_back:
-                self.logger.warning(f"No Aadhar card found for {director_key}")
+                failed_directors.append({
+                    "director": director_key,
+                    "status": "failed",
+                    "error_message": f"No Aadhar card found for {director_key}"
+                })
                 continue
-                
+                     
             if not pan_card:
-                self.logger.warning(f"No PAN card found for {director_key}")
+                failed_directors.append({
+                    "director": director_key,
+                    "status": "failed",
+                    "error_message": f"No PAN card found for {director_key}"
+                })
+                #self.logger.warning(f"No PAN card found for {director_key}")
                 continue
             
             # Get extraction data
@@ -2758,11 +3282,21 @@ class DocumentValidationService:
             
             # Check if both numbers are available and valid
             if not aadhar_number or 'XXXX' in aadhar_number:
-                self.logger.warning(f"Masked or missing Aadhar number for {director_key}")
+                failed_directors.append({
+                    "director": director_key,
+                    "status": "failed",
+                    "error_message": f"Masked or missing Aadhar number for {director_key}"
+                })
+                #self.logger.warning(f"Masked or missing Aadhar number for {director_key}")
                 continue
                 
             if not pan_number:
-                self.logger.warning(f"Missing PAN number for {director_key}")
+                failed_directors.append({
+                    "director": director_key,
+                    "status": "failed",
+                    "error_message": f"Missing PAN number for {director_key}"
+                })
+                #self.logger.warning(f"Missing PAN number for {director_key}")
                 continue
             
             # Remove spaces and any other non-numeric characters from Aadhar number
@@ -2783,27 +3317,45 @@ class DocumentValidationService:
                 # Strictly check for linkage - fail on any error or non-linked status
                 if not linkage_result.get('is_linked', False):
                     error_message = linkage_result.get('message', 'Unknown error')
-                    return {
+                    failed_directors.append({
+                        "director": director_key,
                         "status": "failed",
                         "error_message": f"Aadhar and PAN not linked for {director_key}: {error_message}"
-                    }
+                    })
+                    self.logger.warning(f"Aadhar and PAN not linked for {director_key}: {error_message}")
+                    continue
+               
                 
                 # Successful linkage for at least one Indian director
-                return {
+                failed_directors.append({
+                    "director": director_key,
                     "status": "passed",
                     "error_message": None
-                }
+                })
+                self.logger.info(f"Aadhar and PAN successfully linked for {director_key}")
+    
             except Exception as e:
                 self.logger.error(f"Error verifying Aadhar-PAN linkage for {director_key}: {str(e)}", exc_info=True)
-                return {
+                failed_directors.append({
+                    "director": director_key,
                     "status": "failed",
-                    "error_message": f"Error during Aadhar-PAN linkage verification: {str(e)}"
-                }
-        
+                    "error_message": f"Error during Aadhar-PAN linkage verification for {director_key}: {str(e)}"
+                })
+                self.logger.error(f"Comprehensive linkage verification error: {e}", exc_info=True)
+                
+        if failed_directors:
+            return {
+                "status": "failed",
+                "error_message": "; ".join(
+                    f"{d['director']}: {d['error_message']}" for d in failed_directors
+                ),
+                "details": failed_directors
+            }
         # No Indian directors found for linkage check
         return {
             "status": "passed",
-            "error_message": None
+            "error_message": None,
+            "details": None
         }
     
     def _extract_director_name(self, director_info):
@@ -3008,4 +3560,3 @@ class DocumentValidationService:
         
         # If at least 50% words match
         return len(common_words) >= min(len(parts1), len(parts2)) / 2
-

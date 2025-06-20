@@ -6,6 +6,7 @@ import base64
 import io
 from datetime import datetime
 from typing import Dict, Any, Optional
+from PIL import Image, ImageEnhance, ImageOps
 
 import requests
 import openai
@@ -215,7 +216,7 @@ class ExtractionService:
                 return None
         
         # Validate clarity
-        if data['clarity_score'] < 0.7:
+        if data['clarity_score'] < 0.3:
             self.logger.warning("Signature clarity too low")
             return None
         
@@ -226,6 +227,34 @@ class ExtractionService:
         
         return data
     
+    def _preprocess_signature_image(self, image_bytes: bytes) -> bytes:
+        """
+        Remove transparency, enhance clarity for signature image.
+        Returns modified image bytes.
+        """
+        image = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
+
+        # Remove transparency by pasting onto white background
+        if image.mode in ('RGBA', 'LA'):
+            background = Image.new("RGB", image.size, (255, 255, 255))
+            background.paste(image, mask=image.split()[-1])
+            image = background
+        else:
+            image = image.convert("RGB")
+
+        # Convert to grayscale and enhance contrast
+        image = image.convert("L")
+        image = ImageEnhance.Contrast(image).enhance(2.0)
+
+        # Pad small images
+        min_w, min_h = 200, 80
+        if image.width < min_w or image.height < min_h:
+            image = ImageOps.pad(image, (min_w, min_h), color=255)
+
+        output = io.BytesIO()
+        image.save(output, format='PNG')
+        return output.getvalue()
+
     def extract_document_data(self, source: str, document_type: str) -> dict:
         """
         Extract data from a document (supports URL or local file path)
@@ -256,10 +285,25 @@ class ExtractionService:
                 return self._create_extraction_failure_record(document_type, "Failed to load document")
 
             # 2. Convert to image for AI model
-            image_data = self._convert_to_supported_image(document_data)
+            # image_data = self._convert_to_supported_image(document_data)
+
+            # if not image_data:
+            #     return self._create_extraction_failure_record(document_type, "Image conversion failed")
+
+            # 2. Convert to image for AI model
+            # image_data = self._convert_to_supported_image(document_data)
+            image_data = self._preprocess_signature_image(document_data) if document_type == "signature" else self._convert_to_supported_image(document_data)
 
             if not image_data:
                 return self._create_extraction_failure_record(document_type, "Image conversion failed")
+
+            # ➕ NEW: Preprocess signature image before extraction
+            # if document_type.lower() == "signature":
+            #     try:
+            #         image_data = self._preprocess_signature_image(image_data)
+            #     except Exception as e:
+            #         self.logger.warning(f"Preprocessing failed for signature image: {e}")
+
 
             # 3. Choose extraction prompt
             extraction_prompt = self._select_extraction_prompt(document_type)
@@ -534,7 +578,11 @@ class ExtractionService:
         except Exception as e:
             self.logger.error(f"Comprehensive document conversion error: {str(e)}")
             return None
-        
+
+
+
+    
+
     def _extract_with_ai(self, image_data, document_type, extraction_prompt):
         """
         Extract document data using AI with improved error handling

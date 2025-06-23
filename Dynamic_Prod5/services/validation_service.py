@@ -2978,23 +2978,15 @@ class DocumentValidationService:
             "details": None
         }
     
-
     def _validate_foreign_director_rule(self, directors_validation: Dict, conditions: Dict) -> Dict:
         """
-        Validate passport or driving license for all foreign directors.
-
-        Args:
-            directors_validation (dict): Full validation data for all directors.
-            conditions (dict): Rule-specific conditions (if any).
-
-        Returns:
-            dict: Rule validation result with per-director error reporting.
+        Validate passport or driving license for all foreign directors, with fallback to PAN.
+        Passport expiry and completeness also checked.
         """
         failed_directors = []
         safe_directors = self._safe_validate_directors(directors_validation)
         passport_required = conditions.get('passport_required', True)
 
-            
         for director_key, director_info in safe_directors.items():
             if not isinstance(director_info, dict):
                 continue
@@ -3005,29 +2997,40 @@ class DocumentValidationService:
             documents = director_info.get('documents', {})
             passport = documents.get('passport', {})
             driving_license = documents.get('drivingLicense', {})
+            pan_card = documents.get('panCard', {})
 
-            has_passport = passport.get('is_valid', False)
             has_license = driving_license.get('is_valid', False)
+            has_passport = False
 
-            if not (has_passport or has_license):
-                # Check if panCard exists and is valid as alternative ID
-                pan_card = documents.get('panCard', {})
-                if not pan_card or not pan_card.get('is_valid', False):
+            # Check passport validity and content
+            #if passport.get('is_valid', False):
+            passport_data = passport.get('extracted_data', {})
+            verified_data = self.extraction_service._verify_passport_data(passport_data)
+            if verified_data:
+                print("Verified passport data:", verified_data)
+                has_passport = True
+            else:
+                failed_directors.append({
+                    "director": director_key,
+                    "status": "failed",
+                    "error_message": f"Invalid or expired passport for {director_key}"
+                })
+
+            if not has_passport and not has_license:
+                if pan_card.get('is_valid', False):
+                    self.logger.info(f"Using PAN card as ID document for foreign director {director_key}")
+                else:
                     failed_directors.append({
                         "director": director_key,
                         "status": "failed",
-                        "error_message": "Passport or Driving License is required for foreign directors"
+                        "error_message": f"Passport or Driving License is required for foreign directors (PAN fallback also missing) - {director_key}"
                     })
-                else:
-                    # PanCard is being used as ID document
-                    self.logger.info(f"Using PAN card as ID document for foreign director {director_key}")
 
         if failed_directors:
+            print("Failed directors:", "; ".join(f"{d['director']}: {d['error_message']}" for d in failed_directors))
             return {
                 "status": "failed",
-                "error_message": "; ".join(
-                    f"{d['director']}: {d['error_message']}" for d in failed_directors
-                ),
+                "error_message": "; ".join(f"{d['director']}: {d['error_message']}" for d in failed_directors),
                 "details": failed_directors
             }
 
@@ -3036,6 +3039,64 @@ class DocumentValidationService:
             "error_message": None,
             "details": None
         }
+
+    # def _validate_foreign_director_rule(self, directors_validation: Dict, conditions: Dict) -> Dict:
+    #     """
+    #     Validate passport or driving license for all foreign directors.
+
+    #     Args:
+    #         directors_validation (dict): Full validation data for all directors.
+    #         conditions (dict): Rule-specific conditions (if any).
+
+    #     Returns:
+    #         dict: Rule validation result with per-director error reporting.
+    #     """
+    #     failed_directors = []
+    #     safe_directors = self._safe_validate_directors(directors_validation)
+    #     passport_required = conditions.get('passport_required', True)
+
+            
+    #     for director_key, director_info in safe_directors.items():
+    #         if not isinstance(director_info, dict):
+    #             continue
+
+    #         if director_info.get('nationality', '').lower() != 'foreign':
+    #             continue
+
+    #         documents = director_info.get('documents', {})
+    #         passport = documents.get('passport', {})
+    #         driving_license = documents.get('drivingLicense', {})
+
+    #         has_passport = passport.get('is_valid', False)
+    #         has_license = driving_license.get('is_valid', False)
+
+    #         if not (has_passport or has_license):
+    #             # Check if panCard exists and is valid as alternative ID
+    #             pan_card = documents.get('panCard', {})
+    #             if not pan_card or not pan_card.get('is_valid', False):
+    #                 failed_directors.append({
+    #                     "director": director_key,
+    #                     "status": "failed",
+    #                     "error_message": "Passport or Driving License is required for foreign directors"
+    #                 })
+    #             else:
+    #                 # PanCard is being used as ID document
+    #                 self.logger.info(f"Using PAN card as ID document for foreign director {director_key}")
+
+    #     if failed_directors:
+    #         return {
+    #             "status": "failed",
+    #             "error_message": "; ".join(
+    #                 f"{d['director']}: {d['error_message']}" for d in failed_directors
+    #             ),
+    #             "details": failed_directors
+    #         }
+
+    #     return {
+    #         "status": "passed",
+    #         "error_message": None,
+    #         "details": None
+    #     }
     
 
     def _validate_company_address_proof_rule(self, company_docs_validation, conditions):

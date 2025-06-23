@@ -7,12 +7,13 @@ import io
 from datetime import datetime
 from typing import Dict, Any, Optional
 from PIL import Image, ImageEnhance, ImageOps
-
+import cv2
 import requests
 import openai
 from PIL import Image
 import PyPDF2
 from pdf2image import convert_from_bytes
+import numpy as np
 
 # Import extraction prompts
 from .extraction_prompts import (
@@ -59,7 +60,110 @@ class ExtractionService:
         if self.openai_api_key:
             openai.api_key = self.openai_api_key
             self.logger.info("OpenAI API key initialized successfully")
+    # def assess_passport_photo_opencv(self, image_path: str,document_type: str) -> Dict[str, Any]:
+    #     try:
+    #         image = cv2.imread(image_path)
+    #         if image is None:
+    #             raise ValueError("Image could not be loaded")
 
+    #         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    #         clarity_score = cv2.Laplacian(gray, cv2.CV_64F).var()
+
+    #         face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+    #         faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
+
+    #         return {
+    #             "clarity_score": round(min(clarity_score / 1000, 1.0), 2),
+    #             "is_recent": None,  # unknown
+    #             "is_passport_style": None,  # unknown
+    #             "face_visible": len(faces) > 0
+    #         }
+    
+    #     except Exception as e:
+    #         self.logger.error(f"OpenCV fallback failed for passport photo: {str(e)}", exc_info=True)
+    #         return self._create_extraction_failure_record(document_type, str(e))
+    
+    def assess_passport_photo_opencv(self, image_path: str, doc_type: str = "passport_photo") -> Dict[str, Any]:
+        """
+        Fallback OpenCV-based passport photo assessment
+        """
+        try:
+            # Load image
+            image = cv2.imread(image_path)
+            if image is None:
+                raise ValueError(f"Could not load image from {image_path}")
+            
+            # Convert to grayscale for analysis
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            
+            # 1. CLARITY ASSESSMENT using Laplacian variance
+            laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+            
+            # Improved clarity score mapping based on typical ranges
+            # Low quality: 0-100, Medium: 100-500, High: 500+
+            if laplacian_var < 50:
+                clarity_score = 0.1  # Very poor
+            elif laplacian_var < 100:
+                clarity_score = 0.3  # Poor
+            elif laplacian_var < 200:
+                clarity_score = 0.5  # Fair
+            elif laplacian_var < 400:
+                clarity_score = 0.7  # Good
+            elif laplacian_var < 600:
+                clarity_score = 0.8  # Very good
+            else:
+                clarity_score = 0.9  # Excellent
+            
+            # 2. FACE DETECTION
+            cascade_path = cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+            if not os.path.exists(cascade_path):
+                self.logger.warning("Haar cascade file not found, assuming face visible")
+                face_visible = True  # Assume true if cascade not available
+            else:
+                face_cascade = cv2.CascadeClassifier(cascade_path)
+                faces = face_cascade.detectMultiScale(
+                    gray, 
+                    scaleFactor=1.1, 
+                    minNeighbors=5,
+                    minSize=(30, 30)
+                )
+                face_visible = len(faces) ==1
+            
+            # 3. BASIC IMAGE QUALITY CHECKS
+            height, width = gray.shape
+            
+            # Check if image is too small (passport photos should be reasonable size)
+            is_adequate_size = width >= 200 and height >= 200
+            
+            # Check brightness (avoid too dark/bright images)
+            mean_brightness = np.mean(gray)
+            is_adequate_brightness = 50 < mean_brightness < 200
+            
+            # 4. ASPECT RATIO CHECK (passport photos are typically portrait or square)
+            aspect_ratio = width / height
+            is_portrait_or_square = 0.7 <= aspect_ratio <= 1.3
+            
+            result = {
+                "clarity_score": round(clarity_score, 2),
+                "is_recent": None,  # Cannot determine from OpenCV
+                "is_passport_style": is_portrait_or_square and is_adequate_size,
+                "face_visible": face_visible,
+                
+            }
+            
+            self.logger.info(f"OpenCV assessment completed: {result}")
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"OpenCV fallback failed for passport photo: {str(e)}", exc_info=True)
+            return {
+                "clarity_score": 0.1,  # Default to poor quality
+                "is_recent": None,
+                "is_passport_style": False,
+                "face_visible": False,
+                "error": str(e)
+            }
+    
     def _convert_pdf_to_image(self, pdf_data):
         """
         Convert PDF to image

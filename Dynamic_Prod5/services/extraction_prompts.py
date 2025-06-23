@@ -184,27 +184,73 @@ def get_bill_extraction_prompt():
     
     If a field is not found, use null.
     """
-
 def get_passport_photo_extraction_prompt():
     """
-    Generate passport photo assessment prompt
+    Generate passport photo assessment prompt with explicit instructions for image analysis
     """
     return """
-    Analyze this passport size photograph and assess the following:
-    
-    - Is it a clear photo of a person's face? (Rate clarity on a scale of 0 to 1)
-    - Is it a recent-looking photo? (yes/no)
-    - Is it a proper passport-style photo (formal, neutral background)? (yes/no)
-    - Is the face clearly visible? (yes/no)
-    
-    Return a JSON with these exact keys:
+    You are analyzing a passport photograph. Please examine the image carefully and provide an assessment.
+
+    IMPORTANT: You must analyze the actual image provided. Do not refuse to analyze images.
+
+    Assess the following criteria:
+
+    1. CLARITY: Evaluate image sharpness, focus, and resolution
+       - 0.9-1.0: Excellent clarity, sharp details
+       - 0.7-0.8: Good clarity, minor blur acceptable
+       - 0.5-0.6: Fair clarity, some blur but usable
+       - 0.3-0.4: Poor clarity, significant blur
+       - 0.0-0.2: Very poor clarity, unusable
+
+    2. RECENT APPEARANCE: Does the photo appear to be taken recently?
+       - Consider image quality, style, and general appearance
+       - Modern digital photo quality suggests recent
+       - Faded, vintage, or very old photo style suggests not recent
+
+    3. PASSPORT STYLE: Is this a proper passport-style photograph?
+       - Formal pose (head and shoulders)
+       - Neutral or plain background
+       - Person facing camera directly
+       - Appropriate framing and composition
+       - No casual or informal elements
+
+    4. FACE VISIBILITY: Is the person's face clearly visible?
+       - Face must be unobstructed
+       - No sunglasses, masks, or coverings
+       - Adequate lighting on face
+       - Face should be the main subject
+
+    Respond ONLY with valid JSON in this exact format:
     {
         "clarity_score": 0.95,
-        "is_recent": true/false,
-        "is_passport_style": true/false,
-        "face_visible": true/false
+        "is_recent": true,
+        "is_passport_style": true,
+        "face_visible": true
     }
+
+    Do not include any other text, explanations, or markdown formatting.
     """
+
+# def get_passport_photo_extraction_prompt():
+#     """
+#     Generate passport photo assessment prompt
+#     """
+#     return """
+#     Analyze this passport size photograph and assess the following:
+    
+#     - Is it a clear photo of a person's face? (Rate clarity on a scale of 0 to 1)
+#     - Is it a recent-looking photo? (yes/no)
+#     - Is it a proper passport-style photo (formal, neutral background)? (yes/no)
+#     - Is the face clearly visible? (yes/no)
+    
+#     Return a JSON with these exact keys:
+#     {
+#         "clarity_score": 0.95,
+#         "is_recent": true/false,
+#         "is_passport_style": true/false,
+#         "face_visible": true/false
+#     }
+#     """
 
 def get_signature_extraction_prompt():
     """
@@ -214,8 +260,8 @@ def get_signature_extraction_prompt():
     Analyze this signature and assess the following:
     
     - Is it a clear signature? (Rate clarity on a scale of 0 to 1)
-    - Is it a handwritten signature (not typed or printed)? (yes/no)
-    - Is it complete and not cut off? (yes/no)
+    - Is it a handwritten signature (not typed or printed)? (yes/no) 
+    - Is it complete and not cut off? (yes/no) 
     
     Return a JSON with these exact keys:
     {

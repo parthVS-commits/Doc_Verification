@@ -1208,6 +1208,17 @@ class DocumentValidationService:
             "status": "passed",
             "error_message": None
         }
+    def _map_rule_id_to_doc_key(self, rule_id: str) -> str:
+        mapping = {
+            "ADDRESS_PROOF": "address_proof",
+            "PASSPORT_PHOTO": "passportPhoto",
+            "SIGNATURE": "signature",
+            "INDIAN_DIRECTOR_PAN": "panCard",
+            "INDIAN_DIRECTOR_AADHAR": "aadharCardFront",
+            "AADHAR_PAN_LINKAGE": "aadharCardFront",  # optional mapping
+            "FOREIGN_DIRECTOR_DOCS": "passport"       # or drivinglicense depending on extraction
+        }
+        return mapping.get(rule_id.upper())
 
     def _validate_directors(self, directors: Dict, compliance_rules: Dict) -> Dict:
         if not isinstance(directors, dict):
@@ -1312,7 +1323,15 @@ class DocumentValidationService:
                             "status": "failed",
                             "error_message": failure.get("error_message")
                         }
+                        # # Sync document-level status for streamlit UI display
+                        # if rule_id == "ADDRESS_PROOF":
+                        #     doc_section = validation_results[director_key].get("documents", {})
+                        #     if "address_proof" in doc_section:
+                        #         doc_section["address_proof"]["status"] = "Failed"
+
                         validation_results[director_key]["validation_errors"].append(failure.get("error_message"))
+                     
+
 
                 elif result["status"] == "passed":
                     for k in applicable_keys:
@@ -1328,6 +1347,11 @@ class DocumentValidationService:
                             "status": "passed",
                             "error_message": None
                         }
+                        # if rule_id == "ADDRESS_PROOF":
+                        #     doc_section = validation_results[k].get("documents", {})
+                        #     if "address_proof" in doc_section:
+                        #         doc_section["address_proof"]["status"] = "Valid"
+
 
             except Exception as e:
                 self.logger.error(f"Error applying rule {rule_id}: {e}", exc_info=True)
@@ -1347,9 +1371,9 @@ class DocumentValidationService:
             validation_results['global_errors'] = global_errors
         if rule_validations:
             validation_results['rule_validations'] = rule_validations
-        # print("----------------------------------------------")
-        # print(f"Validation results: {validation_results}")
-        # print("----------------------------------------------")
+        print("----------------------------------------------")
+        print(f"Validation results: {validation_results}")
+        print("----------------------------------------------")
         return validation_results
 
 
@@ -1609,10 +1633,43 @@ class DocumentValidationService:
                 with tempfile.NamedTemporaryFile(delete=False, suffix=f".{file_ext}") as tmp_file:
                     tmp_file.write(decoded)
                     input_source = tmp_file.name
+            if doc_type == "passport_photo":
+                extracted_data = self.extraction_service.extract_document_data(input_source, doc_type)
+                            # Check if extraction failed or returned invalid data
+                should_use_fallback = (
+                    not isinstance(extracted_data, dict) or
+                    extracted_data.get('extraction_status') == 'failed' or
+                    "clarity_score" not in extracted_data or
+                    extracted_data.get("error") or
+                    # Check for the specific error messages from your logs
+                    isinstance(extracted_data, str) and "unable to analyze" in extracted_data.lower()
+                )
+                
+                if should_use_fallback:
+                    self.logger.warning(f"Using OpenCV fallback for passport photo. Original result: {extracted_data}")
+                    opencv_result = self.extraction_service.assess_passport_photo_opencv(input_source, doc_type)
+                    
+                    # Mark as OpenCV-based result
+                    opencv_result["extraction_method"] = "opencv_fallback"
+                    extracted_data = opencv_result
+                else:
+                    extracted_data["extraction_method"] = "primary_extraction"
+                # Step 2: Fallback to OpenCV if result is empty or lacks clarity_score
+                # if not isinstance(extracted_data, dict) or "clarity_score" not in extracted_data:
+                #     self.logger.warning("Fallback to OpenCV for passport photo due to missing clarity_score")
+                #     extracted_data = self.extraction_service.assess_passport_photo_opencv(input_source, doc_type)
+            else:
+                # Extract data using the extraction service
+             
+                extracted_data = self.extraction_service.extract_document_data(
+                    input_source, doc_type
+                )
+            #  # ⚠️ Fallback for passport_photo if extraction gives no usable result
+            # if doc_type == "passport_photo":
+            #     if not isinstance(extracted_data, dict) or "clarity_score" not in extracted_data:
+            #         self.logger.warning("Fallback to OpenCV for passport photo due to missing clarity_score")
+            #         extracted_data = self.extraction_service.assess_passport_photo_opencv(input_source)
 
-            extracted_data = self.extraction_service.extract_document_data(
-                input_source, doc_type
-            )
 
             return {
                 "source": input_source,
@@ -3560,3 +3617,4 @@ class DocumentValidationService:
         
         # If at least 50% words match
         return len(common_words) >= min(len(parts1), len(parts2)) / 2
+

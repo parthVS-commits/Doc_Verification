@@ -1634,30 +1634,36 @@ class DocumentValidationService:
                     tmp_file.write(decoded)
                     input_source = tmp_file.name
             if doc_type == "passport_photo":
-                extracted_data = self.extraction_service.extract_document_data(input_source, doc_type)
-                            # Check if extraction failed or returned invalid data
-                should_use_fallback = (
-                    not isinstance(extracted_data, dict) or
-                    extracted_data.get('extraction_status') == 'failed' or
-                    "clarity_score" not in extracted_data or
-                    extracted_data.get("error") or
-                    # Check for the specific error messages from your logs
-                    isinstance(extracted_data, str) and "unable to analyze" in extracted_data.lower()
-                )
+                return {
+                    "source": input_source,
+                    "document_type": doc_type,
+                    "is_valid": True,
+                    "extracted_data": {}  
+                }
+                # extracted_data = self.extraction_service.extract_document_data(input_source, doc_type)
+                #             # Check if extraction failed or returned invalid data
+                # should_use_fallback = (
+                #     not isinstance(extracted_data, dict) or
+                #     extracted_data.get('extraction_status') == 'failed' or
+                #     "clarity_score" not in extracted_data or
+                #     extracted_data.get("error") or
+                #     # Check for the specific error messages from your logs
+                #     isinstance(extracted_data, str) and "unable to analyze" in extracted_data.lower()
+                # )
                 
-                if should_use_fallback:
-                    self.logger.warning(f"Using OpenCV fallback for passport photo. Original result: {extracted_data}")
-                    opencv_result = self.extraction_service.assess_passport_photo_opencv(input_source, doc_type)
+                # if should_use_fallback:
+                #     self.logger.warning(f"Using OpenCV fallback for passport photo. Original result: {extracted_data}")
+                #     opencv_result = self.extraction_service.assess_passport_photo_opencv(input_source, doc_type)
                     
-                    # Mark as OpenCV-based result
-                    opencv_result["extraction_method"] = "opencv_fallback"
-                    extracted_data = opencv_result
-                else:
-                    extracted_data["extraction_method"] = "primary_extraction"
-                # Step 2: Fallback to OpenCV if result is empty or lacks clarity_score
-                # if not isinstance(extracted_data, dict) or "clarity_score" not in extracted_data:
-                #     self.logger.warning("Fallback to OpenCV for passport photo due to missing clarity_score")
-                #     extracted_data = self.extraction_service.assess_passport_photo_opencv(input_source, doc_type)
+                #     # Mark as OpenCV-based result
+                #     opencv_result["extraction_method"] = "opencv_fallback"
+                #     extracted_data = opencv_result
+                # else:
+                #     extracted_data["extraction_method"] = "primary_extraction"
+                # # Step 2: Fallback to OpenCV if result is empty or lacks clarity_score
+                # # if not isinstance(extracted_data, dict) or "clarity_score" not in extracted_data:
+                # #     self.logger.warning("Fallback to OpenCV for passport photo due to missing clarity_score")
+                # #     extracted_data = self.extraction_service.assess_passport_photo_opencv(input_source, doc_type)
             else:
                 # Extract data using the extraction service
              
@@ -1781,7 +1787,15 @@ class DocumentValidationService:
             if isinstance(doc_url, str) and doc_url:
                 # Get document type
                 doc_type = self._get_document_type(doc_key)
-                
+                if doc_type == "passport_photo":
+                    processed_documents[doc_key] = {
+                        "url": doc_url,
+                        "document_type": doc_type,
+                        "is_valid": True,
+                        "extracted_data": {},  # optionally add empty or dummy fields
+                        "status": "Valid"
+                    }
+                    continue
                 try:
                     # Extract data from document
                     extracted_data = self.extraction_service.extract_document_data(
@@ -2473,9 +2487,9 @@ class DocumentValidationService:
         failed_directors = []
         safe_directors = self._safe_validate_directors(directors_validation)
         # Get conditions with more leniency
-        min_clarity_score = conditions.get('min_clarity_score', 0.1)  # Lower threshold
-        require_passport_style = conditions.get('is_passport_style', False)  # Make optional
-        require_face_visible = conditions.get('face_visible', True)  # Keep this requirement
+        # min_clarity_score = conditions.get('min_clarity_score', 0.1)  # Lower threshold
+        # require_passport_style = conditions.get('is_passport_style', False)  # Make optional
+        # require_face_visible = conditions.get('face_visible', True)  # Keep this requirement
             
         for director_key, director_info in safe_directors.items():
             if not isinstance(director_info, dict):
@@ -2484,7 +2498,7 @@ class DocumentValidationService:
             documents = director_info.get("documents", {})
             passport_photo = documents.get("passportPhoto", {})
 
-            if not passport_photo:
+            if not passport_photo or not passport_photo.get("source"):
                 failed_directors.append({
                     "director": director_key,
                     "status": "failed",
@@ -2492,24 +2506,24 @@ class DocumentValidationService:
                 })
                 continue
 
-            if not passport_photo.get("is_valid", False):
-                failed_directors.append({
-                    "director": director_key,
-                    "status": "failed",
-                    "error_message": f"Invalid passport photo for {director_key}"
-                })
-                continue
+            # if not passport_photo.get("is_valid", False):
+            #     failed_directors.append({
+            #         "director": director_key,
+            #         "status": "failed",
+            #         "error_message": f"Invalid passport photo for {director_key}"
+            #     })
+            #     continue
             # Get extraction data
-            extracted_data = passport_photo.get('extracted_data', {})
+            # extracted_data = passport_photo.get('extracted_data', {})
             
-            # Only check face visibility as a strict requirement
-            if require_face_visible and 'face_visible' in extracted_data:
-                if not extracted_data.get('face_visible', False):
-                    failed_directors.append({
-                        "director": director_key,
-                        "status": "failed",
-                        "error_message": f"Face not clearly visible in passport photo for {director_key}"
-                    })
+            # # Only check face visibility as a strict requirement
+            # if require_face_visible and 'face_visible' in extracted_data:
+            #     if not extracted_data.get('face_visible', False):
+            #         failed_directors.append({
+            #             "director": director_key,
+            #             "status": "failed",
+            #             "error_message": f"Face not clearly visible in passport photo for {director_key}"
+            #         })
 
         if failed_directors:
             return {

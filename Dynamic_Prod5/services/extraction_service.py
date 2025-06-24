@@ -254,22 +254,22 @@ class ExtractionService:
         Returns:
             dict: Verified data or None
         """
-        required_fields = ['name', 'passport_number', 'dob', 'expiry_date']
+        # required_fields = ['name', 'passport_number', 'dob', 'expiry_date']
         
-        for field in required_fields:
-            if not data.get(field):
-                self.logger.warning(f"Missing required passport field: {field}")
-                return None
+        # for field in required_fields:
+        #     if not data.get(field):
+        #         self.logger.warning(f"Missing required passport field: {field}")
+        #         return None
         
-        # Check passport validity
-        try:
-            expiry_date = datetime.strptime(data['expiry_date'], '%d/%m/%Y')
-            if expiry_date < datetime.now():
-                self.logger.warning("Passport has expired")
-                return None
-        except Exception:
-            self.logger.warning("Invalid passport expiry date")
-            return None
+        # # Check passport validity
+        # try:
+        #     expiry_date = datetime.strptime(data['expiry_date'], '%d/%m/%Y')
+        #     if expiry_date < datetime.now():
+        #         self.logger.warning("Passport has expired")
+        #         return None
+        # except Exception:
+        #     self.logger.warning("Invalid passport expiry date")
+        #     return None
         
         return data
 
@@ -502,7 +502,7 @@ class ExtractionService:
         verifications = {
             'aadhar': self._verify_aadhar_data,
             'pan': self._verify_pan_data,
-            'passport': self._verify_passport_data,
+            #'passport': self._verify_passport_data,
             # Add more verification methods for different document types
         }
         

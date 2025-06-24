@@ -32,17 +32,12 @@
         "face_visible": true
       },
       "status": "failed",
-      "error_message": "director_3: Face not clearly visible in passport photo for director_3; director_5: Face not clearly visible in passport photo for director_5",
+      "error_message": "director_5: Passport photo not uploaded for director_5",
       "details": [
-        {
-          "director": "director_3",
-          "status": "failed",
-          "error_message": "Face not clearly visible in passport photo for director_3"
-        },
         {
           "director": "director_5",
           "status": "failed",
-          "error_message": "Face not clearly visible in passport photo for director_5"
+          "error_message": "Passport photo not uploaded for director_5"
         }
       ]
     },
@@ -314,17 +309,10 @@
         "is_authorised": true,
         "documents": {
           "passportPhoto": {
-            "source": "/tmp/tmpik6wpvls.jpg",
+            "source": "/tmp/tmp_wx6nzb2.jpg",
             "document_type": "passport_photo",
             "is_valid": true,
-            "extracted_data": {
-              "clarity_score": 0.85,
-              "is_recent": false,
-              "is_passport_style": true,
-              "face_visible": true,
-              "is_valid": false,
-              "extraction_method": "primary_extraction"
-            }
+            "extracted_data": {}
           }
         },
         "validation_errors": [
@@ -364,17 +352,10 @@
         "is_authorised": true,
         "documents": {
           "passportPhoto": {
-            "source": "/tmp/tmp3t8q964z.jpg",
+            "source": "/tmp/tmpl4ijeyk0.pdf",
             "document_type": "passport_photo",
             "is_valid": true,
-            "extracted_data": {
-              "clarity_score": 0.85,
-              "is_recent": true,
-              "is_passport_style": false,
-              "face_visible": true,
-              "is_valid": false,
-              "extraction_method": "primary_extraction"
-            }
+            "extracted_data": {}
           }
         },
         "validation_errors": [
@@ -414,16 +395,10 @@
         "is_authorised": true,
         "documents": {
           "passportPhoto": {
-            "source": "/tmp/tmpl5vqn0s_.jpg",
+            "source": "/tmp/tmpfninhm3x.pdf",
             "document_type": "passport_photo",
             "is_valid": true,
-            "extracted_data": {
-              "clarity_score": 0.9,
-              "is_recent": null,
-              "is_passport_style": false,
-              "face_visible": false,
-              "extraction_method": "opencv_fallback"
-            }
+            "extracted_data": {}
           }
         },
         "validation_errors": [
@@ -431,7 +406,6 @@
           "Aadhar front, Aadhar back is missing or invalid",
           "Missing extracted data for Aadhar front or back for director_3",
           "No Aadhar card found for director_3",
-          "Face not clearly visible in passport photo for director_3",
           "No signature uploaded for director_3",
           "No address proof uploaded for director_3"
         ],
@@ -447,10 +421,6 @@
           "aadhar_pan_linkage": {
             "status": "failed",
             "error_message": "No Aadhar card found for director_3"
-          },
-          "passport_photo": {
-            "status": "failed",
-            "error_message": "Face not clearly visible in passport photo for director_3"
           },
           "signature": {
             "status": "failed",
@@ -468,17 +438,10 @@
         "is_authorised": true,
         "documents": {
           "passportPhoto": {
-            "source": "/tmp/tmpdq7ujm0i.jpg",
+            "source": "/tmp/tmp8__vux1q.pdf",
             "document_type": "passport_photo",
             "is_valid": true,
-            "extracted_data": {
-              "clarity_score": 0.5,
-              "is_recent": false,
-              "is_passport_style": false,
-              "face_visible": true,
-              "is_valid": false,
-              "extraction_method": "primary_extraction"
-            }
+            "extracted_data": {}
           }
         },
         "validation_errors": [
@@ -516,27 +479,13 @@
       "director_5": {
         "nationality": "Indian",
         "is_authorised": true,
-        "documents": {
-          "passportPhoto": {
-            "source": "/tmp/tmp9jx9m4fb.pdf",
-            "document_type": "passport_photo",
-            "is_valid": true,
-            "extracted_data": {
-              "clarity_score": 0.1,
-              "is_recent": null,
-              "is_passport_style": false,
-              "face_visible": false,
-              "error": "Could not load image from /tmp/tmp9jx9m4fb.pdf",
-              "extraction_method": "opencv_fallback"
-            }
-          }
-        },
+        "documents": {},
         "validation_errors": [
           "PAN card not uploaded or extraction failed for director_5",
           "Aadhar front, Aadhar back is missing or invalid",
           "Missing extracted data for Aadhar front or back for director_5",
           "No Aadhar card found for director_5",
-          "Face not clearly visible in passport photo for director_5",
+          "Passport photo not uploaded for director_5",
           "No signature uploaded for director_5",
           "No address proof uploaded for director_5"
         ],
@@ -555,7 +504,7 @@
           },
           "passport_photo": {
             "status": "failed",
-            "error_message": "Face not clearly visible in passport photo for director_5"
+            "error_message": "Passport photo not uploaded for director_5"
           },
           "signature": {
             "status": "failed",
@@ -602,8 +551,8 @@
   "metadata": {
     "service_id": "1",
     "request_id": "req-12345",
-    "timestamp": "2025-06-23T12:39:56.534651",
-    "processing_time": 8.234605073928833,
+    "timestamp": "2025-06-24T14:51:50.180789",
+    "processing_time": 0.03760242462158203,
     "is_compliant": false
   }
 }

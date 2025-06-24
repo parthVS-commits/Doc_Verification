@@ -78,29 +78,61 @@ def display_results(response_data,_):
             else:
                 st.info("Aadhaar is required for Indian directors. Passport/Driving License is not mandatory.")
 
-            for doc_type in expected_docs:
-                doc_details = actual_docs.get(doc_type, {})
-                status = doc_details.get('status', 'Not Uploaded')
-                errors = doc_details.get('error_messages', [])
+            # for doc_type in expected_docs:
+            #     doc_details = actual_docs.get(doc_type, {})
+            #     status = doc_details.get('status', 'Not Uploaded')
+            #     errors = doc_details.get('error_messages', [])
 
+            #     display_name = doc_type.replace('_', ' ').replace('Card', ' Card').title()
+                
+            #     if status.lower() == 'valid':
+            #         doc_statuses.append(f"✅ {display_name}")
+            #     else:
+            #         if not errors and status == 'Not Uploaded':
+            #             doc_statuses.append(f"❌ {display_name}\n• Document not uploaded")
+            #         else:
+            #             error_list = "\n".join([f"\u2022 {err}" for err in errors])
+            #             doc_statuses.append(f"❌ {display_name}\n{error_list}")           
+            for doc_type in expected_docs:
                 display_name = doc_type.replace('_', ' ').replace('Card', ' Card').title()
                 
-                if status.lower() == 'valid':
-                    doc_statuses.append(f"✅ {display_name}")
-                else:
-                    if not errors and status == 'Not Uploaded':
-                        doc_statuses.append(f"❌ {display_name}\n• Document not uploaded")
+                # Rules-based validation override for specific types
+                rule_map = {
+                    "passportPhoto": "passport_photo",
+                    "signature": "signature",
+                    "address_proof": "address_proof"
+                }
+
+                if doc_type in rule_map:
+                    rule_id = rule_map[doc_type]
+                    rule_data = response_data.get("validation_rules", {}).get(rule_id, {})
+                    failed_directors = [
+                        d["director"] for d in rule_data.get("details", []) if d.get("status") == "failed"
+                    ]
+                    matching_error = next(
+                        (d["error_message"] for d in rule_data.get("details", []) if d["director"] == director_name), 
+                        None
+                    )
+                    if director_name in failed_directors:
+                        doc_statuses.append(f"❌ {display_name}\n• {matching_error or 'Validation failed'}")
+                    
                     else:
-                        error_list = "\n".join([f"\u2022 {err}" for err in errors])
-                        doc_statuses.append(f"❌ {display_name}\n{error_list}")           
-            # for doc_type, doc_details in details.get('documents', {}).items():
-            #     status = doc_details.get('status', '')
-            #     errors = doc_details.get('error_messages', [])
-            #     if status.lower() == 'valid':
-            #         doc_statuses.append(f"✅ {doc_type.replace('_', ' ').title()}")
-            #     else:
-            #         error_list = "\n".join([f"\u2022 {err}" for err in errors])
-            #         doc_statuses.append(f"\n❌ {doc_type.replace('_', ' ').title()}\n{error_list}")
+                        doc_statuses.append(f"✅ {display_name}")
+                else:
+                    # fallback for all other docs
+                    doc_details = actual_docs.get(doc_type, {})
+                    status = doc_details.get('status', 'Not Uploaded')
+                    errors = doc_details.get('error_messages', [])
+
+                    if status.lower() == 'valid':
+                        doc_statuses.append(f"✅ {display_name}")
+                    else:
+                        if not errors and status == 'Not Uploaded':
+                            doc_statuses.append(f"❌ {display_name}\n• Document not uploaded")
+                        else:
+                            error_list = "\n".join([f"\u2022 {err}" for err in errors])
+                            doc_statuses.append(f"❌ {display_name}\n{error_list}")
+
             for i, status in enumerate(doc_statuses):
                 cols[i % 2].write(status)
 

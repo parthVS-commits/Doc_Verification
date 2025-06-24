@@ -1634,30 +1634,36 @@ class DocumentValidationService:
                     tmp_file.write(decoded)
                     input_source = tmp_file.name
             if doc_type == "passport_photo":
-                extracted_data = self.extraction_service.extract_document_data(input_source, doc_type)
-                            # Check if extraction failed or returned invalid data
-                should_use_fallback = (
-                    not isinstance(extracted_data, dict) or
-                    extracted_data.get('extraction_status') == 'failed' or
-                    "clarity_score" not in extracted_data or
-                    extracted_data.get("error") or
-                    # Check for the specific error messages from your logs
-                    isinstance(extracted_data, str) and "unable to analyze" in extracted_data.lower()
-                )
+                return {
+                    "source": input_source,
+                    "document_type": doc_type,
+                    "is_valid": True,
+                    "extracted_data": {}  
+                }
+                # extracted_data = self.extraction_service.extract_document_data(input_source, doc_type)
+                #             # Check if extraction failed or returned invalid data
+                # should_use_fallback = (
+                #     not isinstance(extracted_data, dict) or
+                #     extracted_data.get('extraction_status') == 'failed' or
+                #     "clarity_score" not in extracted_data or
+                #     extracted_data.get("error") or
+                #     # Check for the specific error messages from your logs
+                #     isinstance(extracted_data, str) and "unable to analyze" in extracted_data.lower()
+                # )
                 
-                if should_use_fallback:
-                    self.logger.warning(f"Using OpenCV fallback for passport photo. Original result: {extracted_data}")
-                    opencv_result = self.extraction_service.assess_passport_photo_opencv(input_source, doc_type)
+                # if should_use_fallback:
+                #     self.logger.warning(f"Using OpenCV fallback for passport photo. Original result: {extracted_data}")
+                #     opencv_result = self.extraction_service.assess_passport_photo_opencv(input_source, doc_type)
                     
-                    # Mark as OpenCV-based result
-                    opencv_result["extraction_method"] = "opencv_fallback"
-                    extracted_data = opencv_result
-                else:
-                    extracted_data["extraction_method"] = "primary_extraction"
-                # Step 2: Fallback to OpenCV if result is empty or lacks clarity_score
-                # if not isinstance(extracted_data, dict) or "clarity_score" not in extracted_data:
-                #     self.logger.warning("Fallback to OpenCV for passport photo due to missing clarity_score")
-                #     extracted_data = self.extraction_service.assess_passport_photo_opencv(input_source, doc_type)
+                #     # Mark as OpenCV-based result
+                #     opencv_result["extraction_method"] = "opencv_fallback"
+                #     extracted_data = opencv_result
+                # else:
+                #     extracted_data["extraction_method"] = "primary_extraction"
+                # # Step 2: Fallback to OpenCV if result is empty or lacks clarity_score
+                # # if not isinstance(extracted_data, dict) or "clarity_score" not in extracted_data:
+                # #     self.logger.warning("Fallback to OpenCV for passport photo due to missing clarity_score")
+                # #     extracted_data = self.extraction_service.assess_passport_photo_opencv(input_source, doc_type)
             else:
                 # Extract data using the extraction service
              
@@ -1781,7 +1787,15 @@ class DocumentValidationService:
             if isinstance(doc_url, str) and doc_url:
                 # Get document type
                 doc_type = self._get_document_type(doc_key)
-                
+                if doc_type == "passport_photo":
+                    processed_documents[doc_key] = {
+                        "url": doc_url,
+                        "document_type": doc_type,
+                        "is_valid": True,
+                        "extracted_data": {},  # optionally add empty or dummy fields
+                        "status": "Valid"
+                    }
+                    continue
                 try:
                     # Extract data from document
                     extracted_data = self.extraction_service.extract_document_data(
@@ -2473,9 +2487,9 @@ class DocumentValidationService:
         failed_directors = []
         safe_directors = self._safe_validate_directors(directors_validation)
         # Get conditions with more leniency
-        min_clarity_score = conditions.get('min_clarity_score', 0.1)  # Lower threshold
-        require_passport_style = conditions.get('is_passport_style', False)  # Make optional
-        require_face_visible = conditions.get('face_visible', True)  # Keep this requirement
+        # min_clarity_score = conditions.get('min_clarity_score', 0.1)  # Lower threshold
+        # require_passport_style = conditions.get('is_passport_style', False)  # Make optional
+        # require_face_visible = conditions.get('face_visible', True)  # Keep this requirement
             
         for director_key, director_info in safe_directors.items():
             if not isinstance(director_info, dict):
@@ -2484,7 +2498,7 @@ class DocumentValidationService:
             documents = director_info.get("documents", {})
             passport_photo = documents.get("passportPhoto", {})
 
-            if not passport_photo:
+            if not passport_photo or not passport_photo.get("source"):
                 failed_directors.append({
                     "director": director_key,
                     "status": "failed",
@@ -2492,24 +2506,24 @@ class DocumentValidationService:
                 })
                 continue
 
-            if not passport_photo.get("is_valid", False):
-                failed_directors.append({
-                    "director": director_key,
-                    "status": "failed",
-                    "error_message": f"Invalid passport photo for {director_key}"
-                })
-                continue
+            # if not passport_photo.get("is_valid", False):
+            #     failed_directors.append({
+            #         "director": director_key,
+            #         "status": "failed",
+            #         "error_message": f"Invalid passport photo for {director_key}"
+            #     })
+            #     continue
             # Get extraction data
-            extracted_data = passport_photo.get('extracted_data', {})
+            # extracted_data = passport_photo.get('extracted_data', {})
             
-            # Only check face visibility as a strict requirement
-            if require_face_visible and 'face_visible' in extracted_data:
-                if not extracted_data.get('face_visible', False):
-                    failed_directors.append({
-                        "director": director_key,
-                        "status": "failed",
-                        "error_message": f"Face not clearly visible in passport photo for {director_key}"
-                    })
+            # # Only check face visibility as a strict requirement
+            # if require_face_visible and 'face_visible' in extracted_data:
+            #     if not extracted_data.get('face_visible', False):
+            #         failed_directors.append({
+            #             "director": director_key,
+            #             "status": "failed",
+            #             "error_message": f"Face not clearly visible in passport photo for {director_key}"
+            #         })
 
         if failed_directors:
             return {
@@ -2978,23 +2992,15 @@ class DocumentValidationService:
             "details": None
         }
     
-
     def _validate_foreign_director_rule(self, directors_validation: Dict, conditions: Dict) -> Dict:
         """
-        Validate passport or driving license for all foreign directors.
-
-        Args:
-            directors_validation (dict): Full validation data for all directors.
-            conditions (dict): Rule-specific conditions (if any).
-
-        Returns:
-            dict: Rule validation result with per-director error reporting.
+        Validate passport or driving license for all foreign directors, with fallback to PAN.
+        Passport expiry and completeness also checked.
         """
         failed_directors = []
         safe_directors = self._safe_validate_directors(directors_validation)
         passport_required = conditions.get('passport_required', True)
 
-            
         for director_key, director_info in safe_directors.items():
             if not isinstance(director_info, dict):
                 continue
@@ -3005,29 +3011,40 @@ class DocumentValidationService:
             documents = director_info.get('documents', {})
             passport = documents.get('passport', {})
             driving_license = documents.get('drivingLicense', {})
+            pan_card = documents.get('panCard', {})
 
-            has_passport = passport.get('is_valid', False)
             has_license = driving_license.get('is_valid', False)
+            has_passport = False
 
-            if not (has_passport or has_license):
-                # Check if panCard exists and is valid as alternative ID
-                pan_card = documents.get('panCard', {})
-                if not pan_card or not pan_card.get('is_valid', False):
+            # Check passport validity and content
+            #if passport.get('is_valid', False):
+            passport_data = passport.get('extracted_data', {})
+            verified_data = self.extraction_service._verify_passport_data(passport_data)
+            if verified_data:
+                print("Verified passport data:", verified_data)
+                has_passport = True
+            else:
+                failed_directors.append({
+                    "director": director_key,
+                    "status": "failed",
+                    "error_message": f"Invalid or expired passport for {director_key}"
+                })
+
+            if not has_passport and not has_license:
+                if pan_card.get('is_valid', False):
+                    self.logger.info(f"Using PAN card as ID document for foreign director {director_key}")
+                else:
                     failed_directors.append({
                         "director": director_key,
                         "status": "failed",
-                        "error_message": "Passport or Driving License is required for foreign directors"
+                        "error_message": f"Passport or Driving License is required for foreign directors (PAN fallback also missing) - {director_key}"
                     })
-                else:
-                    # PanCard is being used as ID document
-                    self.logger.info(f"Using PAN card as ID document for foreign director {director_key}")
 
         if failed_directors:
+            print("Failed directors:", "; ".join(f"{d['director']}: {d['error_message']}" for d in failed_directors))
             return {
                 "status": "failed",
-                "error_message": "; ".join(
-                    f"{d['director']}: {d['error_message']}" for d in failed_directors
-                ),
+                "error_message": "; ".join(f"{d['director']}: {d['error_message']}" for d in failed_directors),
                 "details": failed_directors
             }
 
@@ -3036,6 +3053,64 @@ class DocumentValidationService:
             "error_message": None,
             "details": None
         }
+
+    # def _validate_foreign_director_rule(self, directors_validation: Dict, conditions: Dict) -> Dict:
+    #     """
+    #     Validate passport or driving license for all foreign directors.
+
+    #     Args:
+    #         directors_validation (dict): Full validation data for all directors.
+    #         conditions (dict): Rule-specific conditions (if any).
+
+    #     Returns:
+    #         dict: Rule validation result with per-director error reporting.
+    #     """
+    #     failed_directors = []
+    #     safe_directors = self._safe_validate_directors(directors_validation)
+    #     passport_required = conditions.get('passport_required', True)
+
+            
+    #     for director_key, director_info in safe_directors.items():
+    #         if not isinstance(director_info, dict):
+    #             continue
+
+    #         if director_info.get('nationality', '').lower() != 'foreign':
+    #             continue
+
+    #         documents = director_info.get('documents', {})
+    #         passport = documents.get('passport', {})
+    #         driving_license = documents.get('drivingLicense', {})
+
+    #         has_passport = passport.get('is_valid', False)
+    #         has_license = driving_license.get('is_valid', False)
+
+    #         if not (has_passport or has_license):
+    #             # Check if panCard exists and is valid as alternative ID
+    #             pan_card = documents.get('panCard', {})
+    #             if not pan_card or not pan_card.get('is_valid', False):
+    #                 failed_directors.append({
+    #                     "director": director_key,
+    #                     "status": "failed",
+    #                     "error_message": "Passport or Driving License is required for foreign directors"
+    #                 })
+    #             else:
+    #                 # PanCard is being used as ID document
+    #                 self.logger.info(f"Using PAN card as ID document for foreign director {director_key}")
+
+    #     if failed_directors:
+    #         return {
+    #             "status": "failed",
+    #             "error_message": "; ".join(
+    #                 f"{d['director']}: {d['error_message']}" for d in failed_directors
+    #             ),
+    #             "details": failed_directors
+    #         }
+
+    #     return {
+    #         "status": "passed",
+    #         "error_message": None,
+    #         "details": None
+    #     }
     
 
     def _validate_company_address_proof_rule(self, company_docs_validation, conditions):
